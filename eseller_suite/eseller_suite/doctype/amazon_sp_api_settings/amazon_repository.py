@@ -4,12 +4,11 @@
 
 import json
 import time
-import urllib
 
 import dateutil
 import frappe
 from frappe import _
-from datetime import datetime,date, timezone
+from datetime import datetime, date, timezone
 from eseller_suite.eseller_suite.utils import format_date_time_to_ist
 
 from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api import (
@@ -45,35 +44,44 @@ class AmazonRepository:
 
 	def enhance_hsn_error_with_items(self, error_message, doc):
 		"""Enhance HSN/SAC validation errors with item information"""
-		if not doc or not hasattr(doc, 'items'):
+		if not doc or not hasattr(doc, "items"):
 			return error_message
-		
+
 		# Check if error is related to HSN/SAC
 		hsn_keywords = ["HSN/SAC", "HSN", "SAC", "hsn_code", "gst_hsn_code"]
-		if not any(keyword.lower() in str(error_message).lower() for keyword in hsn_keywords):
+		if not any(
+			keyword.lower() in str(error_message).lower() for keyword in hsn_keywords
+		):
 			return error_message
-		
+
 		import re
+
 		error_str = str(error_message)
-		
+
 		# Check for specific error format: "HSN/SAC must exist and should be X digits long for the following row numbers:"
 		# Pattern matches: "for the following row numbers:" followed by optional HTML tags and row numbers
-		row_numbers_pattern = r'(for the following row numbers:\s*(?:<br>)?\s*)(?:<[^>]+>)?([\d\s,]+)(?:<[^>]+>)?'
+		row_numbers_pattern = r"(for the following row numbers:\s*(?:<br>)?\s*)(?:<[^>]+>)?([\d\s,]+)(?:<[^>]+>)?"
 		match = re.search(row_numbers_pattern, error_str, re.IGNORECASE)
-		
+
 		if match:
 			# Extract row numbers (remove HTML tags)
 			row_numbers_str = match.group(2).strip()
-			row_numbers_str = re.sub(r'<[^>]+>', '', row_numbers_str)
-			row_numbers = [int(r.strip()) for r in row_numbers_str.split(',') if r.strip().isdigit()]
-			
+			row_numbers_str = re.sub(r"<[^>]+>", "", row_numbers_str)
+			row_numbers = [
+				int(r.strip())
+				for r in row_numbers_str.split(",")
+				if r.strip().isdigit()
+			]
+
 			# Create a mapping of row idx to item_name
 			row_to_item = {}
 			for item in doc.items:
 				if item.idx in row_numbers:
-					item_name = item.get('item_name') or item.get('item_code') or 'Unknown'
+					item_name = (
+						item.get("item_name") or item.get("item_code") or "Unknown"
+					)
 					row_to_item[item.idx] = item_name
-			
+
 			# Replace row numbers with "row_number {item_name}"
 			enhanced_rows = []
 			for row_num in row_numbers:
@@ -81,7 +89,7 @@ class AmazonRepository:
 					enhanced_rows.append(f"{row_num} {row_to_item[row_num]}")
 				else:
 					enhanced_rows.append(str(row_num))
-			
+
 			# Replace the row numbers in the error message, preserving the prefix
 			enhanced_rows_str = ", ".join(enhanced_rows)
 			# Use a lambda function to avoid regex group reference issues
@@ -89,22 +97,24 @@ class AmazonRepository:
 				row_numbers_pattern,
 				lambda m: m.group(1) + enhanced_rows_str,
 				error_str,
-				flags=re.IGNORECASE
+				flags=re.IGNORECASE,
 			)
 			return enhanced_message
-		
+
 		# Fallback: Find items without HSN code
 		items_without_hsn = []
 		for item in doc.items:
 			if not item.get("gst_hsn_code"):
 				item_info = f"Row {item.idx}: {item.get('item_code', 'Unknown')} ({item.get('item_name', 'N/A')})"
 				items_without_hsn.append(item_info)
-		
+
 		if items_without_hsn:
 			items_list = "\n".join(items_without_hsn)
-			enhanced_message = f"{error_message}\n\nItems requiring HSN/SAC Code:\n{items_list}"
+			enhanced_message = (
+				f"{error_message}\n\nItems requiring HSN/SAC Code:\n{items_list}"
+			)
 			return enhanced_message
-		
+
 		return error_message
 
 	def call_sp_api_method(self, sp_api_method, **kwargs) -> dict:
@@ -120,19 +130,11 @@ class AmazonRepository:
 					payload = result.get("payload")
 				else:
 					payload = result
-				
-				# Log successful API call if logging is enabled
-				# if enable_log:
-				# 	self._create_eseller_log(sp_api_method, kwargs, result, None)
-				
+
 				return payload
 			except SPAPIError as e:
 				if e.error not in errors:
 					errors[e.error] = e.error_description
-
-				# Log failed API call if logging is enabled
-				# if enable_log:
-				# 	self._create_eseller_log(sp_api_method, kwargs, None, e)
 
 				time.sleep(1)
 				continue
@@ -142,15 +144,6 @@ class AmazonRepository:
 				if error_key not in errors:
 					errors[error_key] = str(e)
 
-				# Log failed API call if logging is enabled
-				# if enable_log:
-				# 	# Create a wrapper error object for non-SPAPIError exceptions
-				# 	error_obj = type('GenericError', (object,), {
-				# 		'error': error_key,
-				# 		'error_description': str(e)
-				# 	})()
-				# 	self._create_eseller_log(sp_api_method, kwargs, None, error_obj)
-
 				time.sleep(1)
 				continue
 
@@ -158,106 +151,26 @@ class AmazonRepository:
 			msg = f"<b>Error:</b> {error}<br/><b>Error Description:</b> {errors.get(error)}"
 			frappe.msgprint(msg, alert=True, indicator="red")
 			frappe.log_error(
-				message=f"{error}: {errors.get(error)}", title=f'Method "{sp_api_method.__name__}" failed',
+				message=f"{error}: {errors.get(error)}",
+				title=f'Method "{sp_api_method.__name__}" failed',
 			)
 
 		self.amz_setting.enable_sync = 0
 		self.amz_setting.save()
 
 		frappe.throw(
-			_("Scheduled sync has been temporarily disabled because maximum retries have been exceeded!")
-		)
-	
-	def _mask_sensitive_headers(self, headers):
-		"""Mask sensitive header values for logging"""
-		if not headers:
-			return headers
-		
-		masked_headers = {}
-		sensitive_keys = ("x-amz-access-token", "authorization", "x-amz-security-token")
-		
-		for key, value in headers.items():
-			key_lower = key.lower()
-			if any(sensitive_key in key_lower for sensitive_key in sensitive_keys):
-				# Show first 20 chars and last 10 chars, mask the rest
-				if isinstance(value, str) and len(value) > 30:
-					masked_headers[key] = f"{value[:20]}...{value[-10:]}"
-				else:
-					masked_headers[key] = "***MASKED***"
-			else:
-				masked_headers[key] = value
-		
-		return masked_headers
-	
-	def _create_eseller_log(self, sp_api_method, kwargs, result, error):
-		"""Create eSeller Log entry for API call"""
-		try:
-			# Get the SPAPI instance from the bound method
-			sp_api_instance = getattr(sp_api_method, "__self__", None)
-			request_details = getattr(sp_api_instance, "last_request_details", None) if sp_api_instance else None
-			
-			# Prepare log data
-			api_method_name = sp_api_method.__name__
-			api_url = request_details.get("url") if request_details else ""
-			status_code = request_details.get("status_code") if request_details else ""
-			headers = request_details.get("headers") if request_details else {}
-			# Mask sensitive headers
-			masked_headers = self._mask_sensitive_headers(headers)
-			payload_data = request_details.get("data") or request_details.get("params") if request_details else kwargs
-			
-			# Prepare response data
-			if error:
-				# Use response from request_details if available (for exceptions from make_request)
-				if request_details and request_details.get("response"):
-					response_data = request_details.get("response")
-				else:
-					response_data = {
-						"error": getattr(error, "error", str(error)),
-						"error_description": getattr(error, "error_description", "")
-					}
-			else:
-				response_data = result if result else {}
-			
-			# Create log entry
-			log_doc = frappe.new_doc("eSeller Log")
-			log_doc.api_method = api_method_name
-			log_doc.api_url = api_url
-			log_doc.status_code = status_code
-			log_doc.header = frappe.as_json(masked_headers) if masked_headers else ""
-			log_doc.payload = frappe.as_json(payload_data) if payload_data else ""
-			log_doc.response = frappe.as_json(response_data) if response_data else ""
-			log_doc.reference_doctype = "Amazon SP API Settings"
-			log_doc.reference_docname = self.amz_setting.name
-			
-			if error:
-				error_msg = getattr(error, "error", str(error))
-				error_desc = getattr(error, "error_description", "")
-				# Include full error details in message
-				if request_details and request_details.get("response"):
-					error_response = request_details.get("response")
-					if isinstance(error_response, dict):
-						error_text = frappe.as_json(error_response)
-					else:
-						error_text = str(error_response)
-					log_doc.message = f"Error: {error_msg} - {error_desc}\n\nResponse: {error_text}"
-				else:
-					log_doc.message = f"Error: {error_msg} - {error_desc}" if error_desc else f"Error: {error_msg}"
-			else:
-				log_doc.message = "API call successful"
-			
-			log_doc.insert(ignore_permissions=True)
-		except Exception as e:
-			# Don't fail the main operation if logging fails
-			frappe.log_error(
-				"eSeller Log Creation Error",
-				f"Failed to create eSeller Log: {str(e)}"
+			_(
+				"Scheduled sync has been temporarily disabled because maximum retries have been exceeded!"
 			)
+		)
 
 	def get_finances_instance(self) -> Finances:
 		return Finances(**self.instance_params)
 
 	def get_account(self, name) -> str:
-		account_name = frappe.db.get_value("Account", {"account_name": "Amazon {0}".format(name)})
+		account_name = frappe.db.get_value(
+			"Account", {"account_name": "Amazon {0}".format(name)}
+		)
 
 		if not account_name:
 			new_account = frappe.new_doc("Account")
@@ -275,25 +188,32 @@ class AmazonRepository:
 			sp_api_method=finances.list_financial_events_by_order_id, order_id=order_id
 		)
 
-		charges_and_fees = {"charges": [], "fees": [], "tds": [], "service_fees":[], "principal_amounts":{}, "additional_discount": 0}
-  
+		charges_and_fees = {
+			"charges": [],
+			"fees": [],
+			"tds": [],
+			"service_fees": [],
+			"principal_amounts": {},
+			"additional_discount": 0,
+		}
+
 		if not (
-				financial_events_payload
-				and len(financial_events_payload.get("FinancialEvents", {}))
-			):
-				return charges_and_fees
+			financial_events_payload
+			and len(financial_events_payload.get("FinancialEvents", {}))
+		):
+			return charges_and_fees
 
 		while True:
-			shipment_event_list = financial_events_payload.get("FinancialEvents", {}).get(
-				"ShipmentEventList", []
-			)
-			service_fee_event_list = financial_events_payload.get("FinancialEvents", {}).get(
-				"ServiceFeeEventList", []
-			)
+			shipment_event_list = financial_events_payload.get(
+				"FinancialEvents", {}
+			).get("ShipmentEventList", [])
+			service_fee_event_list = financial_events_payload.get(
+				"FinancialEvents", {}
+			).get("ServiceFeeEventList", [])
 			next_token = financial_events_payload.get("NextToken")
 			principal_amounts = {}
 			promotion_discount = 0
-			seller_sku = ''
+			seller_sku = ""
 			for shipment_event in shipment_event_list:
 				if shipment_event:
 					for shipment_item in shipment_event.get("ShipmentItemList", []):
@@ -309,7 +229,9 @@ class AmazonRepository:
 
 						for charge in charges:
 							charge_type = charge.get("ChargeType")
-							amount = charge.get("ChargeAmount", {}).get("CurrencyAmount", 0)
+							amount = charge.get("ChargeAmount", {}).get(
+								"CurrencyAmount", 0
+							)
 
 							if charge_type != "Principal" and float(amount) != 0:
 								charge_account = self.get_account(charge_type)
@@ -321,8 +243,10 @@ class AmazonRepository:
 										"description": f"{charge_type} for {seller_sku if seller_sku else order_id}",
 									}
 								)
-							if charge_type == 'Principal':
-								principal_amounts[seller_sku] = round((float(amount)/qty), 2)
+							if charge_type == "Principal":
+								principal_amounts[seller_sku] = round(
+									(float(amount) / qty), 2
+								)
 
 						for fee in fees:
 							fee_type = fee.get("FeeType")
@@ -341,7 +265,9 @@ class AmazonRepository:
 
 						for tds in tdss:
 							tds_type = tds.get("ChargeType")
-							amount = tds.get("ChargeAmount", {}).get("CurrencyAmount", 0)
+							amount = tds.get("ChargeAmount", {}).get(
+								"CurrencyAmount", 0
+							)
 							if float(amount) != 0:
 								tds_account = self.get_account(tds_type)
 								charges_and_fees.get("tds").append(
@@ -354,7 +280,9 @@ class AmazonRepository:
 								)
 
 						for promotion in promotion_list:
-							amount = promotion.get("PromotionAmount", {}).get("CurrencyAmount", 0)
+							amount = promotion.get("PromotionAmount", {}).get(
+								"CurrencyAmount", 0
+							)
 							promotion_discount += float(amount)
 
 			charges_and_fees["principal_amounts"] = principal_amounts
@@ -364,7 +292,9 @@ class AmazonRepository:
 				if service_fee:
 					for service_fee_item in service_fee.get("FeeList", []):
 						fee_type = service_fee_item.get("FeeType")
-						amount = service_fee_item.get("FeeAmount", {}).get("CurrencyAmount", 0)
+						amount = service_fee_item.get("FeeAmount", {}).get(
+							"CurrencyAmount", 0
+						)
 						if float(amount) != 0:
 							fee_account = self.get_account(fee_type)
 							charges_and_fees.get("service_fees").append(
@@ -395,33 +325,45 @@ class AmazonRepository:
 			"""Extract item data from either AttributeSets (old format) or summaries (new format)"""
 			if not amazon_item:
 				return {}
-			
+
 			# Try new format first (summaries)
-			if amazon_item.get("summaries") and len(amazon_item.get("summaries", [])) > 0:
+			if (
+				amazon_item.get("summaries")
+				and len(amazon_item.get("summaries", [])) > 0
+			):
 				return amazon_item.get("summaries")[0]
 			# Fall back to old format (AttributeSets)
-			elif amazon_item.get("AttributeSets") and len(amazon_item.get("AttributeSets", [])) > 0:
+			elif (
+				amazon_item.get("AttributeSets")
+				and len(amazon_item.get("AttributeSets", [])) > 0
+			):
 				return amazon_item.get("AttributeSets")[0]
 			return {}
 
 		def create_item_group(amazon_item) -> str:
 			if not amazon_item:
 				return self.amz_setting.parent_item_group
-			
+
 			item_data = get_item_data(amazon_item)
 			if not item_data:
 				return self.amz_setting.parent_item_group
-			
+
 			# New format uses browseClassification.displayName, old format uses ProductGroup
-			item_group_name = item_data.get("ProductGroup") or item_data.get("browseClassification", {}).get("displayName")
+			item_group_name = item_data.get("ProductGroup") or item_data.get(
+				"browseClassification", {}
+			).get("displayName")
 
 			if item_group_name:
-				item_group = frappe.db.get_value("Item Group", filters={"item_group_name": item_group_name})
+				item_group = frappe.db.get_value(
+					"Item Group", filters={"item_group_name": item_group_name}
+				)
 
 				if not item_group:
 					new_item_group = frappe.new_doc("Item Group")
 					new_item_group.item_group_name = item_group_name
-					new_item_group.parent_item_group = self.amz_setting.parent_item_group
+					new_item_group.parent_item_group = (
+						self.amz_setting.parent_item_group
+					)
 					new_item_group.insert()
 					return new_item_group.item_group_name
 				return item_group
@@ -431,7 +373,7 @@ class AmazonRepository:
 		def create_brand(amazon_item) -> str:
 			if not amazon_item:
 				return
-			
+
 			item_data = get_item_data(amazon_item)
 			if not item_data:
 				return
@@ -453,12 +395,14 @@ class AmazonRepository:
 		def create_manufacturer(amazon_item) -> str:
 			if not amazon_item:
 				return
-			
+
 			item_data = get_item_data(amazon_item)
 			if not item_data:
 				return
-	  
-			manufacturer_name = item_data.get("Manufacturer") or item_data.get("manufacturer")
+
+			manufacturer_name = item_data.get("Manufacturer") or item_data.get(
+				"manufacturer"
+			)
 
 			if not manufacturer_name:
 				return
@@ -477,15 +421,18 @@ class AmazonRepository:
 		def create_item_price(amazon_item, item_code) -> None:
 			if not amazon_item:
 				return
-			
+
 			item_data = get_item_data(amazon_item)
 			if not item_data:
 				return
-	  
+
 			# Check if price already exists for this item and price list
-			if frappe.db.exists("Item Price", {"item_code": item_code, "price_list": self.amz_setting.price_list}):
+			if frappe.db.exists(
+				"Item Price",
+				{"item_code": item_code, "price_list": self.amz_setting.price_list},
+			):
 				return
-	  
+
 			item_price = frappe.new_doc("Item Price")
 			item_price.price_list = self.amz_setting.price_list
 			# Old format has ListPrice.Amount, new format might not have price
@@ -501,37 +448,42 @@ class AmazonRepository:
 		amazon_item_response = catalog_items.get_catalog_item(order_item["ASIN"]) or {}
 		amazon_item = amazon_item_response.get("payload", amazon_item_response)
 
-		frappe.log_error(title = "Amazon Item" , message = f"{amazon_item}")
 		if not amazon_item:
-			frappe.log_error("No Amazon Item found for ASIN: {0}. For Order: {1}".format(order_item["ASIN"], order_id))
 			return None
 
 		# Check if item already exists
 		item_code = order_item["SellerSKU"]
 		existing_item_code = frappe.db.exists("Item", item_code)
-		
+
 		if existing_item_code:
-			existing_amazon_item_code = frappe.db.get_value("Item", existing_item_code, "amazon_item_code")
-			
+			existing_amazon_item_code = frappe.db.get_value(
+				"Item", existing_item_code, "amazon_item_code"
+			)
+
 			# If amazon_item_code matches, skip without error
 			if existing_amazon_item_code == order_item["ASIN"]:
 				return existing_item_code
-			
+
 			# If amazon_item_code is different, update the item with new details using db.set_value to avoid locks
 			item_group = create_item_group(amazon_item)
 			brand = create_brand(amazon_item)
-			
-			frappe.db.set_value("Item", existing_item_code, {
-				"item_group": item_group,
-				"brand": brand,
-				"amazon_item_code": order_item["ASIN"],
-				"is_actual_item": 1,
-				"is_sales_item": 1,
-				"description": order_item["Title"]
-			}, update_modified=False)
-			
+
+			frappe.db.set_value(
+				"Item",
+				existing_item_code,
+				{
+					"item_group": item_group,
+					"brand": brand,
+					"amazon_item_code": order_item["ASIN"],
+					"is_actual_item": 1,
+					"is_sales_item": 1,
+					"description": order_item["Title"],
+				},
+				update_modified=False,
+			)
+
 			create_item_price(amazon_item, existing_item_code)
-			
+
 			return existing_item_code
 
 		# Create new item
@@ -552,8 +504,8 @@ class AmazonRepository:
 		return item.name
 
 	def get_item_code(self, order_item, order_id) -> str:
-		if frappe.db.exists('Item', { 'amazon_item_code': order_item['ASIN']}):
-			return frappe.db.get_value('Item', { 'amazon_item_code': order_item['ASIN']})
+		if frappe.db.exists("Item", {"amazon_item_code": order_item["ASIN"]}):
+			return frappe.db.get_value("Item", {"amazon_item_code": order_item["ASIN"]})
 
 		item_code = self.create_item(order_item, order_id)
 		return item_code
@@ -563,7 +515,6 @@ class AmazonRepository:
 		order_items_payload = self.call_sp_api_method(
 			sp_api_method=orders.get_order_items, order_id=order_id
 		)
-		frappe.log_error(title = "Order Items Payload" , message = f"{order_items_payload}")
 		if not order_items_payload:
 			return []
 
@@ -578,28 +529,32 @@ class AmazonRepository:
 				zero_qty_flag = False
 				actual_qty = 0
 				if order_item.get("QuantityOrdered") >= 0:
-					item_amount = float(order_item.get("ItemPrice", {}).get("Amount", 0))
+					item_amount = float(
+						order_item.get("ItemPrice", {}).get("Amount", 0)
+					)
 					item_tax = float(order_item.get("ItemTax", {}).get("Amount", 0))
 					# shipping_price = float(order_item.get("ShippingPrice", {}).get("Amount", 0))
 					# shipping_discount = float(order_item.get("ShippingDiscount", {}).get("Amount", 0))
-					total_order_value = item_amount+item_tax
+					total_order_value = item_amount + item_tax
 					item_qty = float(order_item.get("QuantityOrdered", 0))
 					# In case of Cancelled orders Qty will be 0, Invoice will not get created
 					if not item_qty:
 						item_qty = 1
 						zero_qty_flag = True
 						actual_qty = order_item.get("ProductInfo").get("NumberOfItems")
-					item_rate = item_amount/item_qty
+					item_rate = item_amount / item_qty
 					item_code = self.get_item_code(order_item, order_id)
 					if not item_code:
 						return []
 					actual_item = frappe.db.get_value("Item", item_code, "actual_item")
 					if actual_item:
 						item_code = actual_item
-					
+
 					# Get HSN code from Item master
-					item_hsn_code = frappe.db.get_value("Item", item_code, "gst_hsn_code")
-					
+					item_hsn_code = frappe.db.get_value(
+						"Item", item_code, "gst_hsn_code"
+					)
+
 					order_item_dict = {
 						"item_code": item_code,
 						"item_name": order_item.get("SellerSKU"),
@@ -607,8 +562,8 @@ class AmazonRepository:
 						"rate": item_rate,
 						"base_rate": item_rate,
 						"qty": item_qty,
-						"amount": item_rate*item_qty,
-						"base_amount": item_rate*item_qty,
+						"amount": item_rate * item_qty,
+						"base_amount": item_rate * item_qty,
 						"uom": "Nos",
 						"stock_uom": "Nos",
 						"warehouse": warehouse,
@@ -616,348 +571,29 @@ class AmazonRepository:
 						"allow_zero_valuation_rate": 1,
 						"total_order_value": total_order_value,
 						"zero_qty_flag": zero_qty_flag,
-						"actual_qty": actual_qty
+						"actual_qty": actual_qty,
 					}
-					
+
 					# Add HSN code if available
 					if item_hsn_code:
 						order_item_dict["gst_hsn_code"] = item_hsn_code
-					
+
 					final_order_items.append(order_item_dict)
 
 			if not next_token:
 				break
 
 			order_items_payload = self.call_sp_api_method(
-				sp_api_method=orders.get_order_items, order_id=order_id, next_token=next_token,
+				sp_api_method=orders.get_order_items,
+				order_id=order_id,
+				next_token=next_token,
 			)
 
 		return final_order_items
 
-	def create_sales_invoice_directly(self, order, order_id, order_date, amazon_order_amount, refunds) -> str | None:
-		"""Create Sales Invoice directly without creating Sales Order"""
-		def create_customer(order) -> str:
-			# First check if amazon_customer is set in settings
-			if hasattr(self.amz_setting, 'amazon_customer') and self.amz_setting.amazon_customer:
-				# Verify the customer exists
-				if frappe.db.exists("Customer", self.amz_setting.amazon_customer):
-					return self.amz_setting.amazon_customer
-			
-			# Fall back to creating/finding customer based on Amazon Order ID
-			order_customer_name = order.get('AmazonOrderId', "")
-
-			existing_customer_name = frappe.db.get_value(
-				"Customer", filters={"name": order_customer_name}, fieldname="name"
-			)
-
-			if existing_customer_name:
-				filters = [
-					["Dynamic Link", "link_doctype", "=", "Customer"],
-					["Dynamic Link", "link_name", "=", existing_customer_name],
-					["Dynamic Link", "parenttype", "=", "Contact"],
-				]
-
-				existing_contacts = frappe.get_list("Contact", filters)
-
-				if not existing_contacts:
-					new_contact = frappe.new_doc("Contact")
-					new_contact.first_name = order_customer_name
-					new_contact.append(
-						"links", {"link_doctype": "Customer", "link_name": existing_customer_name},
-					)
-					new_contact.insert()
-
-				return existing_customer_name
-			else:
-				new_customer = frappe.new_doc("Customer")
-				new_customer.customer_name = order_customer_name
-				new_customer.customer_group = self.amz_setting.customer_group
-				new_customer.territory = self.amz_setting.territory
-				new_customer.customer_type = self.amz_setting.customer_type
-				new_customer.save()
-
-				new_contact = frappe.new_doc("Contact")
-				new_contact.first_name = order_customer_name
-				new_contact.append("links", {"link_doctype": "Customer", "link_name": new_customer.name})
-
-				new_contact.insert()
-
-				return new_customer.name
-
-		def create_address(order, customer_name) -> str | None:
-			shipping_address = order.get("ShippingAddress")
-
-			if not shipping_address:
-				return
-			else:
-				make_address = frappe.new_doc("Address")
-				make_address.address_line1 = shipping_address.get("AddressLine1", "Not Provided")
-				make_address.city = shipping_address.get("City", "Not Provided")
-				amazon_state = shipping_address.get("StateOrRegion")
-				if self.amz_setting.map_state_data:
-					if frappe.db.exists("Amazon State Mapping", {"amazon_state": amazon_state}):
-						make_address.state = frappe.db.get_value("Amazon State Mapping", {"amazon_state": amazon_state}, "state")
-					else:
-						failed_sync_record = frappe.new_doc('Amazon Failed Sync Record')
-						failed_sync_record.amazon_order_id = order_id
-						failed_sync_record.remarks = 'No State Mapping found for {0}'.format(amazon_state)
-						failed_sync_record.save(ignore_permissions=True)
-						return
-				else:
-					make_address.state = amazon_state
-				make_address.pincode = shipping_address.get("PostalCode")
-
-				filters = [
-					["Dynamic Link", "link_doctype", "=", "Customer"],
-					["Dynamic Link", "link_name", "=", customer_name],
-					["Dynamic Link", "parenttype", "=", "Address"],
-				]
-				existing_address = frappe.get_list("Address", filters)
-
-				for address in existing_address:
-					address_doc = frappe.get_doc("Address", address["name"])
-					if (
-						address_doc.address_line1 == make_address.address_line1
-						and address_doc.pincode == make_address.pincode
-					):
-						return address
-
-				make_address.append("links", {"link_doctype": "Customer", "link_name": customer_name})
-				make_address.address_type = "Shipping"
-				make_address.insert()
-
-		# Check if Sales Invoice already exists
-		existing_si = frappe.db.get_value("Sales Invoice", {"amazon_order_id": order_id, "is_return": 0}, "name")
-		if existing_si:
-			return existing_si
-
-		customer_name = create_customer(order)
-		create_address(order, customer_name)
-
-		delivery_date = format_date_time_to_ist(order.get("LatestShipDate"))
-		transaction_date = format_date_time_to_ist(order.get("PurchaseDate"))
-		posting_date = get_datetime(transaction_date).strftime('%Y-%m-%d')
-		posting_time = get_datetime(transaction_date).strftime('%H:%M:%S')
-
-		si = frappe.new_doc("Sales Invoice")
-		si.amazon_order_id = order_id
-		si.marketplace_id = order.get("MarketplaceId")
-		si.amazon_order_status = order.get("OrderStatus")
-		si.fulfillment_channel = order.get("FulfillmentChannel")
-		si.replaced_order_id = order.get("ReplacedOrderId") or ''
-		if amazon_order_amount:
-			si.amazon_order_amount = amazon_order_amount
-		si.customer = customer_name
-		si.posting_date = posting_date
-		si.posting_time = posting_time
-		si.set_posting_time = 1
-		si.due_date = delivery_date if getdate(delivery_date) > getdate(transaction_date) else transaction_date
-		si.company = self.amz_setting.company
-		warehouse = self.amz_setting.warehouse
-		if si.fulfillment_channel:
-			if si.fulfillment_channel=='AFN':
-				warehouse = self.amz_setting.afn_warehouse
-		if self.amz_setting.temporary_stock_transfer_required:
-			warehouse = self.amz_setting.temporary_order_warehouse
-		if order.get("IsBusinessOrder"):
-			si.amazon_customer_type = 'B2B'
-		else:
-			si.amazon_customer_type = 'B2C'
-		si.set_warehouse = warehouse
-		si.update_stock = 1
-
-		items = self.get_order_items(order_id)
-
-		if not items:
-			return None
-
-		si.items = []
-		si.taxes = []
-		si.taxes_and_charges = ''
-		total_order_value = 0
-
-		# Check if all items are zero-qty
-		all_zero_qty = all(item.get("zero_qty_flag", False) for item in items)
-
-		for item in items:
-			if not all_zero_qty and item.get("zero_qty_flag", True):
-				continue
-
-			total_order_value += item.get('total_order_value', 0)
-			item["warehouse"] = warehouse
-			
-			# Ensure HSN code is set from Item master if not already present
-			if not item.get("gst_hsn_code") and item.get("item_code"):
-				item_hsn_code = frappe.db.get_value("Item", item.get("item_code"), "gst_hsn_code")
-				if item_hsn_code:
-					item["gst_hsn_code"] = item_hsn_code
-			
-			# Convert item dict to Sales Invoice Item format
-			si_item = {
-				"item_code": item.get("item_code"),
-				"item_name": item.get("item_name"),
-				"description": item.get("description"),
-				"rate": item.get("rate"),
-				"base_rate": item.get("base_rate"),
-				"qty": item.get("qty"),
-				"amount": item.get("amount"),
-				"base_amount": item.get("base_amount"),
-				"uom": item.get("uom", "Nos"),
-				"stock_uom": item.get("stock_uom", "Nos"),
-				"warehouse": warehouse,
-				"conversion_factor": item.get("conversion_factor", 1.0),
-				"allow_zero_valuation_rate": 1,
-				"total_order_value": item.get("total_order_value", 0)
-			}
-			if item.get("gst_hsn_code"):
-				si_item["gst_hsn_code"] = item.get("gst_hsn_code")
-			
-			si.append("items", si_item)
-
-		if total_order_value:
-			si.amazon_order_amount = total_order_value
-
-		taxes_and_charges = self.amz_setting.taxes_charges
-
-		if taxes_and_charges:
-			charges_and_fees = self.get_charges_and_fees(order_id)
-			if charges_and_fees.get("principal_amounts"):
-				principal_amounts = charges_and_fees.get("principal_amounts")
-				for item_row in si.items:
-					if item_row.item_name and principal_amounts.get(item_row.item_name):
-						pricipal_amount = float(principal_amounts.get(item_row.item_name)) or 0
-						qty = item_row.qty
-						if pricipal_amount:
-							item_row.rate = pricipal_amount
-							item_row.base_rate = pricipal_amount
-							item_row.amount = pricipal_amount*qty
-							item_row.base_amount = pricipal_amount*qty
-
-			for charge in charges_and_fees.get("charges"):
-				if charge:
-					si.append("taxes", charge)
-
-			for fee in charges_and_fees.get("fees"):
-				if fee:
-					si.append("taxes", fee)
-
-			for tds in charges_and_fees.get("tds"):
-				if tds:
-					si.append("taxes", tds)
-			
-			if not refunds:
-				for service_fee in charges_and_fees.get("service_fees"):
-					if service_fee:
-						mfn_postage_fee_account_head = frappe.db.get_value('Amazon SP API Settings', self.amz_setting.name, 'mfn_postage_fee_account_head')
-						if( not service_fee.get("account_head") == mfn_postage_fee_account_head) or si.replaced_order_id:
-							si.append("taxes", service_fee)
-						elif not frappe.db.exists("Journal Entry Account", {
-							"amazon_order_id": si.amazon_order_id,
-							"account": service_fee.get("account_head"),
-							"debit_in_account_currency": abs(service_fee.get("tax_amount")),
-						}):
-							try:
-								jv_doc = frappe.new_doc('Journal Entry')
-								jv_doc.voucher_type = 'Journal Entry'
-								jv_doc.posting_date = posting_date
-								jv_doc.user_remark = f'Amazon MFN Postage Fee for Order {si.amazon_order_id}'
-								jv_doc.amazon_order_id = si.amazon_order_id
-								tax_amount = abs(float(service_fee.get("tax_amount", 0)))
-								jv_row = jv_doc.append('accounts')
-								jv_row.account = service_fee.get("account_head")
-								jv_row.debit = tax_amount
-								jv_row.debit_in_account_currency = tax_amount
-								jv_row.user_remark = service_fee.get('description')
-								jv_row.amazon_order_id = si.amazon_order_id
-								default_receivable_account = frappe.db.get_value('Company', self.amz_setting.company, 'default_receivable_account')
-								jv_row = jv_doc.append('accounts')
-								jv_row.credit = abs(float(service_fee.get("tax_amount", 0)))
-								jv_row.credit_in_account_currency = abs(float(service_fee.get("tax_amount", 0)))
-								jv_row.user_remark = f'Amazon MFN Postage Fee for Order {si.amazon_order_id}'
-								jv_row.amazon_order_id = si.amazon_order_id
-								jv_row.party_type = 'Customer'
-								jv_row.party = si.get('customer')
-								jv_row.account = default_receivable_account
-								jv_doc.flags.ignore_mandatory = True
-								jv_doc.save(ignore_permissions=True)
-								jv_doc.submit()
-							except Exception as e:
-								pass
-
-		if charges_and_fees.get("additional_discount"):
-			si.discount_amount = float(charges_and_fees.get("additional_discount")) * -1
-
-		# Set missing values (e.g., debit_to, conversion_rate) even with ignore_validate
-		si.set_missing_values()
-		
-		# Set conversion_rate if not already set (required for GL entry calculation)
-		# Default to 1.0 if currency matches company currency or currency not set
-		if not si.conversion_rate:
-			company_currency = frappe.db.get_value("Company", si.company, "default_currency")
-			if not si.currency or si.currency == company_currency:
-				si.conversion_rate = 1.0
-			else:
-				# If different currency, try to get exchange rate, default to 1.0 if unavailable
-				try:
-					from erpnext.setup.utils import get_exchange_rate
-					si.conversion_rate = get_exchange_rate(si.currency, company_currency, si.posting_date) or 1.0
-				except Exception:
-					si.conversion_rate = 1.0
-		
-		# Calculate taxes and totals explicitly since ignore_validate might skip this
-		si.calculate_taxes_and_totals()
-
-		si.flags.ignore_mandatory = True
-		si.flags.ignore_validate = True
-		si.disable_rounded_total = 1
-		
-		try:
-			si.save(ignore_permissions=True)
-		except Exception as e:
-			error_msg = str(e)
-			# Enhance HSN/SAC errors with item information
-			enhanced_error = self.enhance_hsn_error_with_items(error_msg, si)
-			frappe.log_error(
-				title="Error saving Sales Invoice for Order {0}".format(si.amazon_order_id),
-				message=f"Error: {enhanced_error}\nTraceback: {frappe.get_traceback()}",
-			)
-			raise
-
-		order_statuses = [
-			"Shipped",
-			"InvoiceUnconfirmed",
-			"Unfulfillable",
-		]
-
-		order_status_valid = order.get("OrderStatus") in order_statuses
-		has_taxes = len(si.taxes) > 0
-
-		if order_status_valid and has_taxes:
-			try:
-				si.submit()
-			except Exception as e:
-				error_msg = str(e)
-				# Enhance HSN/SAC errors with item information
-				enhanced_error = self.enhance_hsn_error_with_items(error_msg, si)
-				frappe.log_error(
-					title="Error submitting Sales Invoice for Order {0}".format(si.amazon_order_id),
-					message=f"Error: {enhanced_error}\nTraceback: {frappe.get_traceback()}",
-				)
-				# Don't raise, return the invoice name even if submission fails
-				# It will be submitted later via enq_si_submit
-
-		return si.name
-
 	def create_sales_order(self, order) -> str | None:
 		def create_customer(order) -> str:
-			# First check if amazon_customer is set in settings
-			if hasattr(self.amz_setting, 'amazon_customer') and self.amz_setting.amazon_customer:
-				# Verify the customer exists
-				if frappe.db.exists("Customer", self.amz_setting.amazon_customer):
-					return self.amz_setting.amazon_customer
-			
-			# Fall back to creating/finding customer based on Amazon Order ID
-			order_customer_name = order.get('AmazonOrderId', "")
+			order_customer_name = order.get("AmazonOrderId", "")
 
 			existing_customer_name = frappe.db.get_value(
 				"Customer", filters={"name": order_customer_name}, fieldname="name"
@@ -976,7 +612,11 @@ class AmazonRepository:
 					new_contact = frappe.new_doc("Contact")
 					new_contact.first_name = order_customer_name
 					new_contact.append(
-						"links", {"link_doctype": "Customer", "link_name": existing_customer_name},
+						"links",
+						{
+							"link_doctype": "Customer",
+							"link_name": existing_customer_name,
+						},
 					)
 					new_contact.insert()
 
@@ -991,7 +631,10 @@ class AmazonRepository:
 
 				new_contact = frappe.new_doc("Contact")
 				new_contact.first_name = order_customer_name
-				new_contact.append("links", {"link_doctype": "Customer", "link_name": new_customer.name})
+				new_contact.append(
+					"links",
+					{"link_doctype": "Customer", "link_name": new_customer.name},
+				)
 
 				new_contact.insert()
 
@@ -1004,16 +647,28 @@ class AmazonRepository:
 				return
 			else:
 				make_address = frappe.new_doc("Address")
-				make_address.address_line1 = shipping_address.get("AddressLine1", "Not Provided")
+				make_address.address_line1 = shipping_address.get(
+					"AddressLine1", "Not Provided"
+				)
 				make_address.city = shipping_address.get("City", "Not Provided")
 				amazon_state = shipping_address.get("StateOrRegion")
-				if self.amz_setting.map_state_data:
-					if frappe.db.exists("Amazon State Mapping", {"amazon_state": amazon_state}):
-						make_address.state = frappe.db.get_value("Amazon State Mapping", {"amazon_state": amazon_state}, "state")
+				if frappe.db.get_single_value(
+					"Amazon SP API Settings", "map_state_data"
+				):
+					if frappe.db.exists(
+						"Amazon State Mapping", {"amazon_state": amazon_state}
+					):
+						make_address.state = frappe.db.get_value(
+							"Amazon State Mapping",
+							{"amazon_state": amazon_state},
+							"state",
+						)
 					else:
-						failed_sync_record = frappe.new_doc('Amazon Failed Sync Record')
+						failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
 						failed_sync_record.amazon_order_id = order_id
-						failed_sync_record.remarks = 'No State Mapping found for {0}'.format(amazon_state)
+						failed_sync_record.remarks = (
+							"No State Mapping found for {0}".format(amazon_state)
+						)
 						failed_sync_record.save(ignore_permissions=True)
 						return
 				else:
@@ -1035,14 +690,17 @@ class AmazonRepository:
 					):
 						return address
 
-				make_address.append("links", {"link_doctype": "Customer", "link_name": customer_name})
+				make_address.append(
+					"links", {"link_doctype": "Customer", "link_name": customer_name}
+				)
 				make_address.address_type = "Shipping"
 				make_address.insert()
 
 		def get_refunds(self, order_id, order_date, amazon_order_amount=0) -> dict:
 			finances = self.get_finances_instance()
 			financial_events_payload = self.call_sp_api_method(
-				sp_api_method=finances.list_financial_events_by_order_id, order_id=order_id
+				sp_api_method=finances.list_financial_events_by_order_id,
+				order_id=order_id,
 			)
 
 			if not (
@@ -1051,7 +709,7 @@ class AmazonRepository:
 				and financial_events_payload["FinancialEvents"].get("RefundEventList")
 			):
 				return []
-   
+
 			# Create mapping from SellerSKU to ASIN from order items
 			sku_to_asin = {}
 			orders = self.get_orders_instance()
@@ -1067,18 +725,25 @@ class AmazonRepository:
 						sku_to_asin[seller_sku] = asin
 
 			refund_events = []
-			processed_items = set()
 
 			while True:
-				shipment_event_list = financial_events_payload.get("FinancialEvents", {}).get("ShipmentEventList", [])
-				refund_event_list = financial_events_payload.get("FinancialEvents", {}).get("RefundEventList", [])
-				service_fee_event_list = financial_events_payload.get("FinancialEvents", {}).get("ServiceFeeEventList", [])
+				shipment_event_list = financial_events_payload.get(
+					"FinancialEvents", {}
+				).get("ShipmentEventList", [])
+				refund_event_list = financial_events_payload.get(
+					"FinancialEvents", {}
+				).get("RefundEventList", [])
+				service_fee_event_list = financial_events_payload.get(
+					"FinancialEvents", {}
+				).get("ServiceFeeEventList", [])
 				next_token = financial_events_payload.get("NextToken")
 
-				seller_sku = ''
+				seller_sku = ""
 				for refund_event in refund_event_list:
 					if refund_event:
-						for refund_item in refund_event.get("ShipmentItemAdjustmentList", []):
+						for refund_item in refund_event.get(
+							"ShipmentItemAdjustmentList", []
+						):
 							charges_and_fees = {
 								"posting_date": "",
 								"items": [],
@@ -1086,134 +751,162 @@ class AmazonRepository:
 								"fees": [],
 								"tds": [],
 								"amazon_order_amount": amazon_order_amount,
-								"order_date": order_date
+								"order_date": order_date,
 							}
-							charges_and_fees["posting_date"] = format_date_time_to_ist(refund_event.get("PostedDate"))
+							charges_and_fees["posting_date"] = format_date_time_to_ist(
+								refund_event.get("PostedDate")
+							)
 
 							charges = refund_item.get("ItemChargeAdjustmentList", [])
 							fees = refund_item.get("ItemFeeAdjustmentList", [])
 							promotions = refund_item.get("PromotionAdjustmentList", [])
 							seller_sku = refund_item.get("SellerSKU")
-							
+
 							# Get ASIN from refund_item or from mapping
-							asin = refund_item.get("ASIN") or sku_to_asin.get(seller_sku)
-							
+							asin = refund_item.get("ASIN") or sku_to_asin.get(
+								seller_sku
+							)
+
 							item_code = None
-							if asin and frappe.db.exists('Item', {'amazon_item_code': asin}):
-								item_code = frappe.db.get_value('Item', {'amazon_item_code': asin})
+							if asin and frappe.db.exists(
+								"Item", {"amazon_item_code": asin}
+							):
+								item_code = frappe.db.get_value(
+									"Item", {"amazon_item_code": asin}
+								)
 
 							for charge in charges:
 								charge_type = charge.get("ChargeType")
-								amount = charge.get("ChargeAmount", {}).get("CurrencyAmount", 0)
+								amount = charge.get("ChargeAmount", {}).get(
+									"CurrencyAmount", 0
+								)
 
 								if charge_type != "Principal" and float(amount) != 0:
 									charge_account = self.get_account(charge_type)
-									charges_and_fees["charges"].append({
-										"charge_type": "Actual",
-										"account_head": charge_account,
-										"tax_amount": amount,
-										"description": f"{charge_type} refund for {seller_sku if seller_sku else order_id}",
-									})
+									charges_and_fees["charges"].append(
+										{
+											"charge_type": "Actual",
+											"account_head": charge_account,
+											"tax_amount": amount,
+											"description": f"{charge_type} refund for {seller_sku if seller_sku else order_id}",
+										}
+									)
 								else:
-									charges_and_fees["items"].append({
-										"item_code": item_code,
-										"qty": refund_item.get("QuantityShipped"),
-										"amount": charge.get("ChargeAmount", {}).get("CurrencyAmount", 0)
-									})
+									charges_and_fees["items"].append(
+										{
+											"item_code": item_code,
+											"qty": refund_item.get("QuantityShipped"),
+											"amount": charge.get(
+												"ChargeAmount", {}
+											).get("CurrencyAmount", 0),
+										}
+									)
 
 							for fee in fees:
 								fee_type = fee.get("FeeType")
-								amount = fee.get("FeeAmount", {}).get("CurrencyAmount", 0)
+								amount = fee.get("FeeAmount", {}).get(
+									"CurrencyAmount", 0
+								)
 
 								if float(amount) != 0:
 									fee_account = self.get_account(fee_type)
-									charges_and_fees["fees"].append({
-										"charge_type": "Actual",
-										"account_head": fee_account,
-										"tax_amount": amount,
-										"description": f"{fee_type} refund for {seller_sku if seller_sku else order_id}",
-									})
+									charges_and_fees["fees"].append(
+										{
+											"charge_type": "Actual",
+											"account_head": fee_account,
+											"tax_amount": amount,
+											"description": f"{fee_type} refund for {seller_sku if seller_sku else order_id}",
+										}
+									)
 
 							for promotion in promotions:
 								promotion_type = promotion.get("PromotionType")
-								amount = promotion.get("PromotionAmount", {}).get("CurrencyAmount", 0)
+								amount = promotion.get("PromotionAmount", {}).get(
+									"CurrencyAmount", 0
+								)
 
 								if float(amount) != 0:
 									promotion_account = self.get_account(promotion_type)
-									charges_and_fees["fees"].append({
-										"charge_type": "Actual",
-										"account_head": promotion_account,
-										"tax_amount": amount,
-										"description": f"{promotion_type} refund for {seller_sku if seller_sku else order_id}",
-									})
+									charges_and_fees["fees"].append(
+										{
+											"charge_type": "Actual",
+											"account_head": promotion_account,
+											"tax_amount": amount,
+											"description": f"{promotion_type} refund for {seller_sku if seller_sku else order_id}",
+										}
+									)
 
 							refund_events.append(charges_and_fees)
 
 				for service_fee in service_fee_event_list:
 					if service_fee:
 						charges_and_fees = {
-							"posting_date": "", 
-							"items": [], 
-							"charges": [], 
-							"fees": [], 
-							"tds": [], 
-							"amazon_order_amount": amazon_order_amount, 
-							"order_date": order_date
+							"posting_date": "",
+							"items": [],
+							"charges": [],
+							"fees": [],
+							"tds": [],
+							"amazon_order_amount": amazon_order_amount,
+							"order_date": order_date,
 						}
 
 						for service_fee_item in service_fee.get("FeeList", []):
 							fee_type = service_fee_item.get("FeeType")
-							amount = service_fee_item.get("FeeAmount", {}).get("CurrencyAmount", 0)
-							
+							amount = service_fee_item.get("FeeAmount", {}).get(
+								"CurrencyAmount", 0
+							)
+
 							if float(amount) != 0:
 								fee_account = self.get_account(fee_type)
-								description = (
-									f"{fee_type} for {seller_sku if seller_sku else order_id}"
+								description = f"{fee_type} for {seller_sku if seller_sku else order_id}"
+								charges_and_fees["fees"].append(
+									{
+										"charge_type": "Actual",
+										"account_head": fee_account,
+										"tax_amount": amount,
+										"description": description,
+									}
 								)
-								charges_and_fees["fees"].append({
-									"charge_type": "Actual",
-									"account_head": fee_account,
-									"tax_amount": amount,
-									"description": description,
-								})
-						
-						refund_events.append(charges_and_fees)		
-				
+
+						refund_events.append(charges_and_fees)
+
 				tdss = []
 				for shipment_event in shipment_event_list:
 					if shipment_event:
 						charges_and_fees = {
-							"posting_date": "", 
-							"items": [], 
-							"charges": [], 
-							"fees": [], 
-							"tds": [], 
-							"amazon_order_amount": amazon_order_amount, 
-							"order_date": order_date
+							"posting_date": "",
+							"items": [],
+							"charges": [],
+							"fees": [],
+							"tds": [],
+							"amazon_order_amount": amazon_order_amount,
+							"order_date": order_date,
 						}
 
 						for shipment_item in shipment_event.get("ShipmentItemList", []):
 							tds_list = shipment_item.get("ItemTaxWithheldList", [])
 							if tds_list:
 								tdss = tds_list[0].get("TaxesWithheld", [])
-							
+
 							for tds in tdss:
 								tds_type = tds.get("ChargeType")
-								amount = tds.get("ChargeAmount", {}).get("CurrencyAmount", 0)
-								
+								amount = tds.get("ChargeAmount", {}).get(
+									"CurrencyAmount", 0
+								)
+
 								if float(amount) != 0:
 									tds_account = self.get_account(tds_type)
-									description = (
-										f"{tds_type} for {seller_sku if seller_sku else order_id}"
+									description = f"{tds_type} for {seller_sku if seller_sku else order_id}"
+									charges_and_fees["tds"].append(
+										{
+											"charge_type": "Actual",
+											"account_head": tds_account,
+											"tax_amount": amount,
+											"description": description,
+										}
 									)
-									charges_and_fees["tds"].append({
-										"charge_type": "Actual",
-										"account_head": tds_account,
-										"tax_amount": amount,
-										"description": description,
-									})
-						
-						refund_events.append(charges_and_fees)			
+
+						refund_events.append(charges_and_fees)
 
 				refund_events.append(charges_and_fees)
 
@@ -1234,135 +927,195 @@ class AmazonRepository:
 		so_id = None
 		so_docstatus = 0
 		refunds = get_refunds(self, order_id, order_date, amazon_order_amount)
-		
+
 		items = self.get_order_items(order_id)
 		if frappe.db.exists("Sales Order", {"amazon_order_id": order_id}):
-			so_id, so_docstatus = frappe.db.get_value("Sales Order", filters={"amazon_order_id": order_id}, fieldname=["name", "docstatus"])
+			so_id, so_docstatus = frappe.db.get_value(
+				"Sales Order",
+				filters={"amazon_order_id": order_id},
+				fieldname=["name", "docstatus"],
+			)
 
 		if so_id and refunds and so_docstatus:
-			si = frappe.db.exists("Sales Invoice", { "amazon_order_id": order_id, "docstatus":1, "is_return":0})
-			existing_return_si = frappe.db.exists("Sales Invoice", {"amazon_order_id": order_id, "docstatus": 1, "is_return": 1, "return_against": si})
+			si = frappe.db.exists(
+				"Sales Invoice",
+				{"amazon_order_id": order_id, "docstatus": 1, "is_return": 0},
+			)
+			existing_return_si = frappe.db.exists(
+				"Sales Invoice",
+				{
+					"amazon_order_id": order_id,
+					"docstatus": 1,
+					"is_return": 1,
+					"return_against": si,
+				},
+			)
 
 			# Preventing returns that are linked in an amazon payment entry from being cancelled
-			if existing_return_si and frappe.db.exists("Amazon Payment Entry Item", {"order_id": order_id, "return_sales_invoice": existing_return_si}):
+			if existing_return_si and frappe.db.exists(
+				"Amazon Payment Entry Item",
+				{"order_id": order_id, "return_sales_invoice": existing_return_si},
+			):
 				return so_id
 
 			if existing_return_si:
-				existing_return_si_jv = frappe.db.exists("Journal Entry Account", {"reference_name": existing_return_si, "reference_type": "Sales Invoice"})
+				existing_return_si_jv = frappe.db.exists(
+					"Journal Entry Account",
+					{
+						"reference_name": existing_return_si,
+						"reference_type": "Sales Invoice",
+					},
+				)
 				if existing_return_si_jv:
 					return so_id
 				try:
 					frappe.get_doc("Sales Invoice", existing_return_si).cancel()
 				except Exception as e:
-					frappe.log_error("Error cancelling Return Invoice for {0}".format(existing_return_si), e, "Sales Invoice", so_id)
+					frappe.log_error(
+						"Error cancelling Return Invoice for {0}: {1}".format(
+							existing_return_si, str(e)
+						)
+					)
 					return so_id
 			return_si = frappe.new_doc("Sales Invoice")
 			if existing_return_si:
 				return_si.amended_from = existing_return_si
 			return_created = False
 			for refund in refunds:
-				if not frappe.db.exists("Sales Invoice", { "amazon_order_id": order_id, "docstatus":1, "is_return":0 }):
+				if not frappe.db.exists(
+					"Sales Invoice",
+					{"amazon_order_id": order_id, "docstatus": 1, "is_return": 0},
+				):
 					# Stock Ghosting Process: "Ghosting" refers to adjusting stock for an invoice that lacks sufficient stock, not creating phantom stock.
 					if self.amz_setting.adjust_stock_for_returns:
-						ghost_stock_si = frappe.db.exists("Sales Invoice", {"amazon_order_id": order_id, "is_return": 0})
+						ghost_stock_si = frappe.db.exists(
+							"Sales Invoice",
+							{"amazon_order_id": order_id, "is_return": 0},
+						)
 						if ghost_stock_si:
-							ghost_stock_si_doc = frappe.get_doc("Sales Invoice", ghost_stock_si)
+							ghost_stock_si_doc = frappe.get_doc(
+								"Sales Invoice", ghost_stock_si
+							)
 
-							if ghost_stock_si_doc.posting_date < self.amz_setting.return_invoice_stock_adjustment_before:
+							if (
+								ghost_stock_si_doc.posting_date
+								< self.amz_setting.return_invoice_stock_adjustment_before
+							):
 
 								# Create Stock Entry
-								stock_for_return_created = create_stock_entry(ghost_stock_si)
-								if stock_for_return_created and ghost_stock_si_doc.docstatus == 0:
+								stock_for_return_created = create_stock_entry(
+									ghost_stock_si
+								)
+								if (
+									stock_for_return_created
+									and ghost_stock_si_doc.docstatus == 0
+								):
 									try:
 										ghost_stock_si_doc.submit()
 									except Exception as e:
-										frappe.log_error("Error submiting Invoice {0} for Order ID {1}".format(ghost_stock_si, order_id), str(e), "Sales Invoice")
-
+										frappe.log_error(
+											"Error submitting Invoice {0} for Order ID {1}: {2}".format(
+												ghost_stock_si, order_id, str(e)
+											)
+										)
 
 				# First check for submitted invoice
-				si = frappe.db.get_value("Sales Invoice", { "amazon_order_id": order_id, "docstatus":1, "is_return":0  })
-				si_docstatus = 1 if si else None
-				
+				si = frappe.db.get_value(
+					"Sales Invoice",
+					{"amazon_order_id": order_id, "docstatus": 1, "is_return": 0},
+				)
+
 				# If not found, check for draft invoice
 				if not si:
-					si = frappe.db.get_value("Sales Invoice", { "amazon_order_id": order_id, "docstatus":0, "is_return":0  })
+					si = frappe.db.get_value(
+						"Sales Invoice",
+						{"amazon_order_id": order_id, "docstatus": 0, "is_return": 0},
+					)
 					if si:
-						si_docstatus = 0
 						# Try to submit the draft invoice
 						try:
 							si_doc = frappe.get_doc("Sales Invoice", si)
 							si_doc.flags.ignore_validate = True
 							si_doc.submit()
-							si_docstatus = 1
-							frappe.log_error(
-								title="Return Invoice - Submitted Draft Invoice",
-								message=f"Order ID: {order_id}, Draft Invoice {si} was submitted before creating return invoice"
-							)
 						except Exception as e:
 							frappe.log_error(
 								title="Return Invoice - Failed to Submit Draft Invoice",
-								message=f"Order ID: {order_id}, Invoice: {si}, Error: {str(e)}, Traceback: {frappe.get_traceback()}"
+								message=f"Order ID: {order_id}, Invoice: {si}, Error: {str(e)}",
 							)
 							# Continue anyway, we'll try to create return against draft invoice
-				
+
 				if not si:
-					frappe.log_error(
-						title="Return Invoice Creation - No Sales Invoice Found",
-						message=f"Order ID: {order_id}, SO ID: {so_id}, Refund: {frappe.as_json(refund)}"
-					)
 					# Check if failed sync record already exists for this order_id with similar return invoice error
-					remarks = f'Failed to create return Sales Invoice, No Sales Invoice found for Amazon Order ID: {order_id}. Sales Order ID: {so_id}'
+					remarks = f"Failed to create return Sales Invoice, No Sales Invoice found for Amazon Order ID: {order_id}. Sales Order ID: {so_id}"
 					existing_records = frappe.get_all(
 						"Amazon Failed Sync Record",
 						filters={
 							"amazon_order_id": order_id,
-							"remarks": ["like", "%Failed to create return Sales Invoice%"]
+							"remarks": [
+								"like",
+								"%Failed to create return Sales Invoice%",
+							],
 						},
-						limit=1
+						limit=1,
 					)
 					if not existing_records:
-						failed_sync_record = frappe.new_doc('Amazon Failed Sync Record')
+						failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
 						failed_sync_record.amazon_order_id = order_id
 						failed_sync_record.remarks = remarks
 						failed_sync_record.payload = frappe.as_json(refund)
 						if refund.get("posting_date"):
-							failed_sync_record.posting_date = dateutil.parser.parse(refund.get("posting_date")).strftime("%Y-%m-%d")
+							failed_sync_record.posting_date = dateutil.parser.parse(
+								refund.get("posting_date")
+							).strftime("%Y-%m-%d")
 						if refund.get("order_date"):
-							failed_sync_record.amazon_order_date = dateutil.parser.parse(refund.get("order_date")).strftime("%Y-%m-%d")
+							failed_sync_record.amazon_order_date = (
+								dateutil.parser.parse(
+									refund.get("order_date")
+								).strftime("%Y-%m-%d")
+							)
 						if refund.get("amazon_order_amount"):
-							failed_sync_record.amazon_order_amount = refund.get("amazon_order_amount")
+							failed_sync_record.amazon_order_amount = refund.get(
+								"amazon_order_amount"
+							)
 						failed_sync_record.save(ignore_permissions=True)
 					continue
-				
-				# Log if we're using a draft invoice
-				if si_docstatus == 0:
-					frappe.log_error(
-						title="Return Invoice - Using Draft Invoice",
-						message=f"Order ID: {order_id}, Invoice: {si}, Status: Draft (docstatus=0). Creating return against draft invoice."
-					)
 
-				existing_returns = tuple(frappe.db.get_all("Sales Invoice", {"return_against":si}, pluck="name"))
-				
+				existing_returns = tuple(
+					frappe.db.get_all(
+						"Sales Invoice", {"return_against": si}, pluck="name"
+					)
+				)
+
 				# Set return invoice basic properties once per refund
 				try:
 					if refund.get("posting_date"):
 						posting_date = refund.get("posting_date")
 						return_si.posting_date = getdate(posting_date)
-						return_si.posting_time = get_datetime(posting_date).strftime("%H:%M:%S")
+						return_si.posting_time = get_datetime(posting_date).strftime(
+							"%H:%M:%S"
+						)
 						return_si.set_posting_time = 1
 				except Exception as e:
-					frappe.log_error(f"Error setting posting date for return invoice: {str(e)}", "Return Invoice")
-				
+					frappe.log_error(
+						f"Error setting posting date for return invoice: {str(e)}"
+					)
+
 				return_si.is_return = 1
 				return_si.update_stock = 1
 				return_si.return_against = si
-				return_si.customer = frappe.db.get_value("Sales Invoice", si, "customer")
-				return_warehouse = frappe.db.get_value("Sales Invoice", si, "set_warehouse")
+				return_si.customer = frappe.db.get_value(
+					"Sales Invoice", si, "customer"
+				)
+				return_warehouse = frappe.db.get_value(
+					"Sales Invoice", si, "set_warehouse"
+				)
 				if self.amz_setting.temporary_stock_transfer_required:
 					return_warehouse = self.amz_setting.warehouse
-					si_fulfilement_channel = frappe.db.get_value("Sales Invoice", si, "fulfillment_channel")
+					si_fulfilement_channel = frappe.db.get_value(
+						"Sales Invoice", si, "fulfillment_channel"
+					)
 					if si_fulfilement_channel:
-						if si_fulfilement_channel=='AFN':
+						if si_fulfilement_channel == "AFN":
 							return_warehouse = self.amz_setting.afn_warehouse
 				return_si.set_warehouse = return_warehouse
 				return_si.amazon_order_id = order_id
@@ -1374,75 +1127,98 @@ class AmazonRepository:
 				# Process items for this refund
 				refund_items_processed = False
 				for item in refund.get("items", []):
-					if not item.get('item_code'):
-						frappe.log_error(
-							title="Return Invoice - Missing item_code",
-							message=f"Order ID: {order_id}, Item data: {frappe.as_json(item)}"
-						)
+					if not item.get("item_code"):
 						continue
-					
-					actual_item = frappe.db.get_value("Item", item.get('item_code'), "actual_item")
+
+					actual_item = frappe.db.get_value(
+						"Item", item.get("item_code"), "actual_item"
+					)
 					if not actual_item:
 						actual_item = item.get("item_code")
-					
+
 					if not actual_item:
-						frappe.log_error(
-							title="Return Invoice - Invalid item_code",
-							message=f"Order ID: {order_id}, Item data: {frappe.as_json(item)}"
-						)
 						continue
-					
+
 					returned_qty = 0
 					for returned_si in existing_returns:
-						existing_returned_qty = frappe.db.get_value("Sales Invoice Item", {"parent": returned_si, "item_code": actual_item}, "qty") or 0
-						returned_qty += existing_returned_qty
-					
-					if not frappe.db.exists("Sales Invoice Item", {"parent": si, "item_code": actual_item}):
-						frappe.log_error(
-							title="Return Invoice - Item not found in original invoice",
-							message=f"Order ID: {order_id}, Item: {actual_item}, SI: {si}"
+						existing_returned_qty = (
+							frappe.db.get_value(
+								"Sales Invoice Item",
+								{"parent": returned_si, "item_code": actual_item},
+								"qty",
+							)
+							or 0
 						)
+						returned_qty += existing_returned_qty
+
+					if not frappe.db.exists(
+						"Sales Invoice Item", {"parent": si, "item_code": actual_item}
+					):
 						continue
-					
-					item_qty = float(item.get('qty') or 0)
-					item_amount = float(item.get('amount') or 0)
-					original_qty = frappe.db.get_value("Sales Invoice Item", {"parent": si, "item_code": actual_item}, "qty") or 0
-					
+
+					item_qty = float(item.get("qty") or 0)
+					item_amount = float(item.get("amount") or 0)
+					original_qty = (
+						frappe.db.get_value(
+							"Sales Invoice Item",
+							{"parent": si, "item_code": actual_item},
+							"qty",
+						)
+						or 0
+					)
+
 					if original_qty >= (returned_qty + item_qty):
 						# Calculate rate safely, handling None and division by zero
 						if item_qty and item_qty != 0:
 							rate = abs(item_amount / item_qty)
 						else:
 							# If qty is 0 or None, get rate from original invoice item
-							rate = frappe.db.get_value("Sales Invoice Item", {"parent": si, "item_code": actual_item}, "rate") or 0
-						
+							rate = (
+								frappe.db.get_value(
+									"Sales Invoice Item",
+									{"parent": si, "item_code": actual_item},
+									"rate",
+								)
+								or 0
+							)
+
 						# Get HSN code from original invoice item
-						original_item_hsn = frappe.db.get_value("Sales Invoice Item", {"parent": si, "item_code": actual_item}, "gst_hsn_code")
+						original_item_hsn = frappe.db.get_value(
+							"Sales Invoice Item",
+							{"parent": si, "item_code": actual_item},
+							"gst_hsn_code",
+						)
 						if not original_item_hsn:
 							# Fallback to Item master
-							original_item_hsn = frappe.db.get_value("Item", actual_item, "gst_hsn_code")
-						
+							original_item_hsn = frappe.db.get_value(
+								"Item", actual_item, "gst_hsn_code"
+							)
+
 						return_item = {
 							"item_code": actual_item,
 							"qty": -1 * item_qty,
 							"rate": rate,
 							"sales_order": so_id,
-							"sales_invoice_item": frappe.db.get_value("Sales Invoice Item", {"parent": si, "item_code": actual_item}, "name")
+							"sales_invoice_item": frappe.db.get_value(
+								"Sales Invoice Item",
+								{"parent": si, "item_code": actual_item},
+								"name",
+							),
 						}
-						
+
 						# Add HSN code if available
 						if original_item_hsn:
 							return_item["gst_hsn_code"] = original_item_hsn
-						
+
 						return_si.append("items", return_item)
-						frappe.db.set_value("Sales Invoice Item", {"parent": si, "item_code": actual_item}, "refunded", 1)
+						frappe.db.set_value(
+							"Sales Invoice Item",
+							{"parent": si, "item_code": actual_item},
+							"refunded",
+							1,
+						)
 						refund_items_processed = True
 						return_created = True
-					else:
-						frappe.log_error(
-							title="Return Invoice - Insufficient quantity",
-							message=f"Order ID: {order_id}, Item: {actual_item}, Original Qty: {original_qty}, Returned Qty: {returned_qty}, Requested Qty: {item_qty}"
-						)
 
 				# Add charges and fees if items were processed
 				if refund_items_processed:
@@ -1466,104 +1242,154 @@ class AmazonRepository:
 					if tds_entries:
 						tds_attempted = True
 						import re
+
 						# Extract item names from TDS descriptions (format: "ItemTDS for {item_name}")
 						item_names_from_tds = set()
 						for tds_entry in tds_entries:
 							description = tds_entry.get("description", "")
 							# Match pattern: "ItemTDS for {item_name}" or "{tds_type} for {item_name}"
-							match = re.search(r'for\s+(.+)$', description, re.IGNORECASE)
+							match = re.search(
+								r"for\s+(.+)$", description, re.IGNORECASE
+							)
 							if match:
 								item_name = match.group(1).strip()
 								if item_name:
 									item_names_from_tds.add(item_name)
-						
+
 						# Try to find items using extracted names
 						if item_names_from_tds:
 							for item_name_from_tds in item_names_from_tds:
 								# Try to find item by item_name, item_code, or amazon_item_code
 								item_code = None
-								
+
 								# First try by item_name
-								item_code = frappe.db.get_value("Item", {"item_name": item_name_from_tds}, "name")
-								
+								item_code = frappe.db.get_value(
+									"Item", {"item_name": item_name_from_tds}, "name"
+								)
+
 								# If not found, try by item_code
 								if not item_code:
-									item_code = frappe.db.get_value("Item", {"item_code": item_name_from_tds}, "name")
-								
+									item_code = frappe.db.get_value(
+										"Item",
+										{"item_code": item_name_from_tds},
+										"name",
+									)
+
 								# If not found, try by amazon_item_code (ASIN)
 								if not item_code:
-									item_code = frappe.db.get_value("Item", {"amazon_item_code": item_name_from_tds}, "name")
-								
+									item_code = frappe.db.get_value(
+										"Item",
+										{"amazon_item_code": item_name_from_tds},
+										"name",
+									)
+
 								if item_code:
 									# Get actual item if it's a variant
-									actual_item = frappe.db.get_value("Item", item_code, "actual_item")
+									actual_item = frappe.db.get_value(
+										"Item", item_code, "actual_item"
+									)
 									if not actual_item:
 										actual_item = item_code
-									
+
 									# Check if item exists in original invoice
-									if frappe.db.exists("Sales Invoice Item", {"parent": si, "item_code": actual_item}):
+									if frappe.db.exists(
+										"Sales Invoice Item",
+										{"parent": si, "item_code": actual_item},
+									):
 										# Get original item details including HSN code
 										original_item = frappe.db.get_value(
 											"Sales Invoice Item",
 											{"parent": si, "item_code": actual_item},
 											["qty", "rate", "name", "gst_hsn_code"],
-											as_dict=True
+											as_dict=True,
 										)
-										
+
 										if original_item:
 											# Calculate quantity from TDS entries for this item
 											tds_total_amount = sum(
 												float(tds.get("tax_amount", 0))
 												for tds in tds_entries
-												if item_name_from_tds in tds.get("description", "")
+												if item_name_from_tds
+												in tds.get("description", "")
 											)
-											
+
 											# Estimate qty based on TDS amount (use original rate if available)
-											original_rate = original_item.get("rate", 0) or 1
-											estimated_qty = abs(tds_total_amount) / original_rate if original_rate > 0 else 1
-											
+											original_rate = (
+												original_item.get("rate", 0) or 1
+											)
+											estimated_qty = (
+												abs(tds_total_amount) / original_rate
+												if original_rate > 0
+												else 1
+											)
+
 											# Check returned quantity
 											returned_qty = 0
 											for returned_si in existing_returns:
-												existing_returned_qty = frappe.db.get_value(
-													"Sales Invoice Item",
-													{"parent": returned_si, "item_code": actual_item},
-													"qty"
-												) or 0
-												returned_qty += abs(existing_returned_qty)
-											
+												existing_returned_qty = (
+													frappe.db.get_value(
+														"Sales Invoice Item",
+														{
+															"parent": returned_si,
+															"item_code": actual_item,
+														},
+														"qty",
+													)
+													or 0
+												)
+												returned_qty += abs(
+													existing_returned_qty
+												)
+
 											original_qty = original_item.get("qty", 0)
-											
-											if original_qty >= (returned_qty + estimated_qty):
+
+											if original_qty >= (
+												returned_qty + estimated_qty
+											):
 												# Create return invoice item with HSN code from original
 												return_item = {
 													"item_code": actual_item,
 													"qty": -1 * estimated_qty,
 													"rate": original_rate,
 													"sales_order": so_id,
-													"sales_invoice_item": original_item.get("name")
+													"sales_invoice_item": original_item.get(
+														"name"
+													),
 												}
-												
+
 												# Add HSN code from original invoice item if available
 												if original_item.get("gst_hsn_code"):
-													return_item["gst_hsn_code"] = original_item.get("gst_hsn_code")
+													return_item["gst_hsn_code"] = (
+														original_item.get(
+															"gst_hsn_code"
+														)
+													)
 												else:
 													# Try to get HSN code from Item master
-													item_hsn_code = frappe.db.get_value("Item", actual_item, "gst_hsn_code")
+													item_hsn_code = frappe.db.get_value(
+														"Item",
+														actual_item,
+														"gst_hsn_code",
+													)
 													if item_hsn_code:
-														return_item["gst_hsn_code"] = item_hsn_code
-												
+														return_item["gst_hsn_code"] = (
+															item_hsn_code
+														)
+
 												return_si.append("items", return_item)
-												frappe.db.set_value("Sales Invoice Item", {"parent": si, "item_code": actual_item}, "refunded", 1)
+												frappe.db.set_value(
+													"Sales Invoice Item",
+													{
+														"parent": si,
+														"item_code": actual_item,
+													},
+													"refunded",
+													1,
+												)
 												refund_items_processed = True
 												return_created = True
 												tds_items_found = True
-												
-												frappe.log_error(
-													title="Return Invoice - Item found from TDS",
-													message=f"Order ID: {order_id}, Item: {actual_item}, Item name from TDS: {item_name_from_tds}, Estimated Qty: {estimated_qty}, HSN Code: {return_item.get('gst_hsn_code', 'Not set')}"
-												)
-					
+
 					# If items were processed from TDS, add charges, fees, and TDS
 					if refund_items_processed:
 						for charge in refund.get("charges", []):
@@ -1580,73 +1406,68 @@ class AmazonRepository:
 						return_si.update_billed_amount_in_sales_order = 1
 					# Only show error if TDS was attempted but failed to find/create items
 					elif tds_attempted and not tds_items_found:
-						frappe.log_error(
-							title="Return Invoice - No items processed",
-							message=f"Order ID: {order_id}, Refund: {frappe.as_json(refund)}, Items: {frappe.as_json(refund.get('items', []))}, TDS: {frappe.as_json(refund.get('tds', []))}"
-						)
 						# Check if failed sync record already exists for this order_id with similar return invoice error
 						remarks = f'Failed to create return Sales Invoice, No items could be processed. Sales Order ID: {so_id}, Refund items: {len(refund.get("items", []))}'
 						existing_records = frappe.get_all(
 							"Amazon Failed Sync Record",
 							filters={
 								"amazon_order_id": order_id,
-								"remarks": ["like", "%Failed to create return Sales Invoice%"]
+								"remarks": [
+									"like",
+									"%Failed to create return Sales Invoice%",
+								],
 							},
-							limit=1
+							limit=1,
 						)
 						if not existing_records:
-							failed_sync_record = frappe.new_doc('Amazon Failed Sync Record')
+							failed_sync_record = frappe.new_doc(
+								"Amazon Failed Sync Record"
+							)
 							failed_sync_record.amazon_order_id = order_id
 							failed_sync_record.remarks = remarks
 							failed_sync_record.payload = frappe.as_json(refund)
 							if refund.get("posting_date"):
-								failed_sync_record.posting_date = dateutil.parser.parse(refund.get("posting_date")).strftime("%Y-%m-%d")
+								failed_sync_record.posting_date = dateutil.parser.parse(
+									refund.get("posting_date")
+								).strftime("%Y-%m-%d")
 							if refund.get("order_date"):
-								failed_sync_record.amazon_order_date = dateutil.parser.parse(refund.get("order_date")).strftime("%Y-%m-%d")
+								failed_sync_record.amazon_order_date = (
+									dateutil.parser.parse(
+										refund.get("order_date")
+									).strftime("%Y-%m-%d")
+								)
 							if refund.get("amazon_order_amount"):
-								failed_sync_record.amazon_order_amount = refund.get("amazon_order_amount")
+								failed_sync_record.amazon_order_amount = refund.get(
+									"amazon_order_amount"
+								)
 							failed_sync_record.save(ignore_permissions=True)
 						continue
-			
+
 			# Only insert and submit if items were created
 			if return_created and len(return_si.items) > 0:
 				try:
 					return_si.insert(ignore_permissions=True)
 					return_si.submit()
-					frappe.log_error(
-						title="Return Invoice Created Successfully",
-						message=f"Order ID: {order_id}, Return Invoice: {return_si.name}, Items: {len(return_si.items)}"
-					)
 				except Exception as e:
 					error_msg = str(e)
 					# Enhance HSN/SAC errors with item information
-					enhanced_error = self.enhance_hsn_error_with_items(error_msg, return_si)
+					enhanced_error = self.enhance_hsn_error_with_items(
+						error_msg, return_si
+					)
 					frappe.log_error(
 						title="Error creating Return Invoice",
-						message=f"Order ID: {order_id or 'None'}, Error: {enhanced_error}, Traceback: {frappe.get_traceback()}"
+						message=f"Order ID: {order_id or 'None'}, Error: {enhanced_error}",
 					)
-			else:
-				frappe.log_error(
-					title="Return Invoice - Not created (no items)",
-					message=f"Order ID: {order_id}, Return Created Flag: {return_created}, Items Count: {len(return_si.items) if return_si.items else 0}"
-				)
 
 			return so_id
 
 		else:
-			# Check if Sales Order creation is enabled
-			enable_sales_order_creation = getattr(self.amz_setting, 'enable_sales_order_creation', 1)
-			
-			# If Sales Order creation is disabled, create Sales Invoice directly
-			if not enable_sales_order_creation:
-				return self.create_sales_invoice_directly(order, order_id, order_date, amazon_order_amount, refunds)
-			
 			if so_docstatus and so_id:
 				return so_id
 			if not so_id:
 				so = frappe.new_doc("Sales Order")
 			else:
-				so = frappe.get_doc('Sales Order', so_id)
+				so = frappe.get_doc("Sales Order", so_id)
 
 			customer_name = create_customer(order)
 			create_address(order, customer_name)
@@ -1658,25 +1479,29 @@ class AmazonRepository:
 			so.marketplace_id = order.get("MarketplaceId")
 			so.amazon_order_status = order.get("OrderStatus")
 			so.fulfillment_channel = order.get("FulfillmentChannel")
-			so.replaced_order_id = order.get("ReplacedOrderId") or ''
+			so.replaced_order_id = order.get("ReplacedOrderId") or ""
 			if amazon_order_amount:
 				so.amazon_order_amount = amazon_order_amount
 			so.amazon_order_status = order.get("OrderStatus")
 			so.customer = customer_name
-			so.delivery_date = delivery_date if getdate(delivery_date) > getdate(transaction_date) else transaction_date
-			so.transaction_date = get_datetime(transaction_date).strftime('%Y-%m-%d')
-			so.transaction_time = get_datetime(transaction_date).strftime('%H:%M:%S')
+			so.delivery_date = (
+				delivery_date
+				if getdate(delivery_date) > getdate(transaction_date)
+				else transaction_date
+			)
+			so.transaction_date = get_datetime(transaction_date).strftime("%Y-%m-%d")
+			so.transaction_time = get_datetime(transaction_date).strftime("%H:%M:%S")
 			so.company = self.amz_setting.company
 			warehouse = self.amz_setting.warehouse
 			if so.fulfillment_channel:
-				if so.fulfillment_channel=='AFN':
+				if so.fulfillment_channel == "AFN":
 					warehouse = self.amz_setting.afn_warehouse
 			if self.amz_setting.temporary_stock_transfer_required:
 				warehouse = self.amz_setting.temporary_order_warehouse
 			if order.get("IsBusinessOrder"):
-				so.amazon_customer_type = 'B2B'
+				so.amazon_customer_type = "B2B"
 			else:
-				so.amazon_customer_type = 'B2C'
+				so.amazon_customer_type = "B2C"
 			so.set_warehouse = warehouse
 
 			items = self.get_order_items(order_id)
@@ -1689,11 +1514,15 @@ class AmazonRepository:
 					so.flags.ignore_validate = True
 					so.disable_rounded_total = 1
 					so.custom_validate()
-					if so.grand_total>=0:
+					if so.grand_total >= 0:
 						so.save(ignore_permissions=True)
-					elif not frappe.db.exists("Amazon Failed Sync Record", {"amazon_order_id":order_id}):
-						remarks = 'Failed to create Sales Order for {0}. Sales Order grand Total = {1}'.format(order_id, so.grand_total)
-						failed_sync_record = frappe.new_doc('Amazon Failed Sync Record')
+					elif not frappe.db.exists(
+						"Amazon Failed Sync Record", {"amazon_order_id": order_id}
+					):
+						remarks = "Failed to create Sales Order for {0}. Sales Order grand Total = {1}".format(
+							order_id, so.grand_total
+						)
+						failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
 						failed_sync_record.amazon_order_id = order_id
 						failed_sync_record.remarks = remarks
 						failed_sync_record.payload = so.as_dict()
@@ -1702,13 +1531,20 @@ class AmazonRepository:
 						failed_sync_record.amazon_order_date = so.transaction_date
 						failed_sync_record.grand_total = so.grand_total
 						failed_sync_record.amazon_order_amount = so.amazon_order_amount
-						if not frappe.db.exists('Amazon Failed Sync Record', { 'amazon_order_id':order_id, 'remarks':remarks, 'grand_total':so.grand_total }):
+						if not frappe.db.exists(
+							"Amazon Failed Sync Record",
+							{
+								"amazon_order_id": order_id,
+								"remarks": remarks,
+								"grand_total": so.grand_total,
+							},
+						):
 							failed_sync_record.save(ignore_permissions=True)
 					return
 
 			so.items = []
 			so.taxes = []
-			so.taxes_and_charges = ''
+			so.taxes_and_charges = ""
 			total_order_value = 0
 
 			# Check if all items are zero-qty
@@ -1720,31 +1556,38 @@ class AmazonRepository:
 					zero_qty_items.append(item)
 					continue
 
-				total_order_value += item.get('total_order_value', 0)
+				total_order_value += item.get("total_order_value", 0)
 				item["warehouse"] = warehouse
-				
+
 				# Ensure HSN code is set from Item master if not already present
 				if not item.get("gst_hsn_code") and item.get("item_code"):
-					item_hsn_code = frappe.db.get_value("Item", item.get("item_code"), "gst_hsn_code")
+					item_hsn_code = frappe.db.get_value(
+						"Item", item.get("item_code"), "gst_hsn_code"
+					)
 					if item_hsn_code:
 						item["gst_hsn_code"] = item_hsn_code
-				
+
 				so.append("items", item)
 
 			if len(zero_qty_items) > 0:
 				so.cancelled_items = []
 				for zero_item in zero_qty_items:
-					so.append("cancelled_items", {
-						"cancelled_item_code": zero_item.get("item_code"),
-						"cancelled_item_qty": zero_item.get("actual_qty")
-					})
+					so.append(
+						"cancelled_items",
+						{
+							"cancelled_item_code": zero_item.get("item_code"),
+							"cancelled_item_qty": zero_item.get("actual_qty"),
+						},
+					)
 
 			if total_order_value:
 				so.amazon_order_amount = total_order_value
 
 			taxes_and_charges = self.amz_setting.taxes_charges
-   
-			item_lookup = {item["item_code"]: item.get('total_order_value', 0) for item in items}
+
+			item_lookup = {
+				item["item_code"]: item.get("total_order_value", 0) for item in items
+			}
 			for row in so.items:
 				total_value = item_lookup.get(row.item_code)
 				if total_value:
@@ -1755,14 +1598,18 @@ class AmazonRepository:
 				if charges_and_fees.get("principal_amounts"):
 					principal_amounts = charges_and_fees.get("principal_amounts")
 					for item_row in so.items:
-						if item_row.item_name and principal_amounts.get(item_row.item_name):
-							pricipal_amount = float(principal_amounts.get(item_row.item_name)) or 0
+						if item_row.item_name and principal_amounts.get(
+							item_row.item_name
+						):
+							pricipal_amount = (
+								float(principal_amounts.get(item_row.item_name)) or 0
+							)
 							qty = item_row.qty
 							if pricipal_amount:
 								item_row.rate = pricipal_amount
 								item_row.base_rate = pricipal_amount
-								item_row.amount = pricipal_amount*qty
-								item_row.base_amount = pricipal_amount*qty
+								item_row.amount = pricipal_amount * qty
+								item_row.base_amount = pricipal_amount * qty
 
 				for charge in charges_and_fees.get("charges"):
 					if charge:
@@ -1775,54 +1622,81 @@ class AmazonRepository:
 				for tds in charges_and_fees.get("tds"):
 					if tds:
 						so.append("taxes", tds)
-				
+
 				if not refunds:
 					for service_fee in charges_and_fees.get("service_fees"):
 						if service_fee:
-							mfn_postage_fee_account_head = frappe.db.get_value('Amazon SP API Settings', self.amz_setting.name, 'mfn_postage_fee_account_head')
-							if( not service_fee.get("account_head") == mfn_postage_fee_account_head) or so.replaced_order_id:
+							mfn_postage_fee_account_head = frappe.db.get_value(
+								"Amazon SP API Settings",
+								self.amz_setting.name,
+								"mfn_postage_fee_account_head",
+							)
+							if (
+								not service_fee.get("account_head")
+								== mfn_postage_fee_account_head
+							) or so.replaced_order_id:
 								so.append("taxes", service_fee)
-							elif not frappe.db.exists("Journal Entry Account", {
-								"amazon_order_id": so.amazon_order_id,
-								"account": service_fee.get("account_head"),
-								"debit_in_account_currency": abs(service_fee.get("tax_amount")),
-							}):
+							elif not frappe.db.exists(
+								"Journal Entry Account",
+								{
+									"amazon_order_id": so.amazon_order_id,
+									"account": service_fee.get("account_head"),
+									"debit_in_account_currency": abs(
+										service_fee.get("tax_amount")
+									),
+								},
+							):
 								try:
-									jv_doc = frappe.new_doc('Journal Entry')
-									jv_doc.voucher_type = 'Journal Entry'
+									jv_doc = frappe.new_doc("Journal Entry")
+									jv_doc.voucher_type = "Journal Entry"
 									jv_doc.posting_date = so.transaction_date
-									jv_doc.user_remark = f'Amazon MFN Postage Fee for Order {so.amazon_order_id}'
+									jv_doc.user_remark = f"Amazon MFN Postage Fee for Order {so.amazon_order_id}"
 									jv_doc.amazon_order_id = so.amazon_order_id
-									tax_amount = abs(float(service_fee.get("tax_amount", 0)))
-									jv_row = jv_doc.append('accounts')
+									tax_amount = abs(
+										float(service_fee.get("tax_amount", 0))
+									)
+									jv_row = jv_doc.append("accounts")
 									jv_row.account = service_fee.get("account_head")
 									jv_row.debit = tax_amount
 									jv_row.debit_in_account_currency = tax_amount
-									jv_row.user_remark = row.get('description')
+									jv_row.user_remark = row.get("description")
 									jv_row.amazon_order_id = so.amazon_order_id
-									default_receivable_account = frappe.db.get_value('Company', self.amz_setting.company, 'default_receivable_account')
-									jv_row = jv_doc.append('accounts')
-									jv_row.credit = abs(float(service_fee.get("tax_amount", 0)))
-									jv_row.credit_in_account_currency = abs(float(service_fee.get("tax_amount", 0)))
-									jv_row.user_remark = f'Amazon MFN Postage Fee for Order {so.amazon_order_id}'
+									default_receivable_account = frappe.db.get_value(
+										"Company",
+										self.amz_setting.company,
+										"default_receivable_account",
+									)
+									jv_row = jv_doc.append("accounts")
+									jv_row.credit = abs(
+										float(service_fee.get("tax_amount", 0))
+									)
+									jv_row.credit_in_account_currency = abs(
+										float(service_fee.get("tax_amount", 0))
+									)
+									jv_row.user_remark = f"Amazon MFN Postage Fee for Order {so.amazon_order_id}"
 									jv_row.amazon_order_id = so.amazon_order_id
-									jv_row.party_type = 'Customer'
-									jv_row.party = so.get('customer')
+									jv_row.party_type = "Customer"
+									jv_row.party = so.get("customer")
 									jv_row.account = default_receivable_account
 									jv_doc.flags.ignore_mandatory = True
 									jv_doc.save(ignore_permissions=True)
 									jv_doc.submit()
 								except Exception as e:
-									pass
+									frappe.log_error(
+										title="Error creating Journal Entry for MFN Postage Fee",
+										message=f"Order ID: {so.amazon_order_id}, Error: {str(e)}",
+									)
 
 				if charges_and_fees.get("additional_discount"):
-					so.discount_amount = float(charges_and_fees.get("additional_discount")) * -1
+					so.discount_amount = (
+						float(charges_and_fees.get("additional_discount")) * -1
+					)
 
 			so.flags.ignore_mandatory = True
 			so.flags.ignore_validate = True
 			so.disable_rounded_total = 1
 			so.custom_validate()
-			if so.grand_total>=0:
+			if so.grand_total >= 0:
 				try:
 					so.save(ignore_permissions=True)
 				except Exception as e:
@@ -1830,8 +1704,10 @@ class AmazonRepository:
 					# Enhance HSN/SAC errors with item information
 					enhanced_error = self.enhance_hsn_error_with_items(error_msg, so)
 					frappe.log_error(
-						title="Error saving Sales Order for Order {0}".format(so.amazon_order_id),
-						message=f"Error: {enhanced_error}\nTraceback: {frappe.get_traceback()}",
+						title="Error saving Sales Order for Order {0}".format(
+							so.amazon_order_id
+						),
+						message=f"Error: {enhanced_error}",
 					)
 
 				order_statuses = [
@@ -1842,12 +1718,18 @@ class AmazonRepository:
 
 				order_status_valid = order.get("OrderStatus") in order_statuses
 				has_taxes = len(so.taxes) > 0
-				temp_transfer_required = self.amz_setting.temporary_stock_transfer_required
+				temp_transfer_required = (
+					self.amz_setting.temporary_stock_transfer_required
+				)
 
-				transfer_exists = frappe.db.exists("Stock Entry", {
-					"name": so.temporary_stock_tranfer_id,
-					"docstatus": 1
-				}) if temp_transfer_required else True
+				transfer_exists = (
+					frappe.db.exists(
+						"Stock Entry",
+						{"name": so.temporary_stock_tranfer_id, "docstatus": 1},
+					)
+					if temp_transfer_required
+					else True
+				)
 
 				if order_status_valid and has_taxes and transfer_exists:
 					try:
@@ -1855,14 +1737,22 @@ class AmazonRepository:
 					except Exception as e:
 						error_msg = str(e)
 						# Enhance HSN/SAC errors with item information
-						enhanced_error = self.enhance_hsn_error_with_items(error_msg, so)
-						frappe.log_error(
-							title="Error submitting Sales Order for Order {0}".format(so.amazon_order_id),
-							message=f"Error: {enhanced_error}\nTraceback: {frappe.get_traceback()}",
+						enhanced_error = self.enhance_hsn_error_with_items(
+							error_msg, so
 						)
-			elif not frappe.db.exists("Amazon Failed Sync Record", {"amazon_order_id":order_id}):
-				remarks = 'Failed to create Sales Order for {0}. Sales Order grand Total = {1}'.format(order_id, so.grand_total)
-				failed_sync_record = frappe.new_doc('Amazon Failed Sync Record')
+						frappe.log_error(
+							title="Error submitting Sales Order for Order {0}".format(
+								so.amazon_order_id
+							),
+							message=f"Error: {enhanced_error}",
+						)
+			elif not frappe.db.exists(
+				"Amazon Failed Sync Record", {"amazon_order_id": order_id}
+			):
+				remarks = "Failed to create Sales Order for {0}. Sales Order grand Total = {1}".format(
+					order_id, so.grand_total
+				)
+				failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
 				failed_sync_record.amazon_order_id = order_id
 				failed_sync_record.remarks = remarks
 				failed_sync_record.replaced_order_id = so.replaced_order_id
@@ -1872,14 +1762,21 @@ class AmazonRepository:
 				failed_sync_record.amazon_order_amount = so.amazon_order_amount
 				if not so_id:
 					failed_sync_record.payload = so.as_dict()
-				if not frappe.db.exists('Amazon Failed Sync Record', { 'amazon_order_id':order_id, 'grand_total':so.grand_total, 'remarks':remarks }):
+				if not frappe.db.exists(
+					"Amazon Failed Sync Record",
+					{
+						"amazon_order_id": order_id,
+						"grand_total": so.grand_total,
+						"remarks": remarks,
+					},
+				):
 					failed_sync_record.save(ignore_permissions=True)
 
 			return so.name
 
 	def get_orders(self, last_updated_after, sync_selected_date_only=0) -> list:
 		orders = self.get_orders_instance()
-		
+
 		order_statuses = [
 			"Shipped",
 			"InvoiceUnconfirmed",
@@ -1890,7 +1787,9 @@ class AmazonRepository:
 		orders_payload = None
 		try:
 			if sync_selected_date_only:
-				last_updated_before = add_days(getdate(last_updated_after), 1).strftime( "%Y-%m-%d")
+				last_updated_before = add_days(getdate(last_updated_after), 1).strftime(
+					"%Y-%m-%d"
+				)
 				orders_payload = self.call_sp_api_method(
 					sp_api_method=orders.get_orders,
 					last_updated_after=last_updated_after,
@@ -1908,9 +1807,8 @@ class AmazonRepository:
 					max_results=50,
 				)
 		except Exception as e:
-			frappe.log_error(title = "GET Orders" , message = frappe.get_traceback(e))
+			frappe.log_error(title="GET Orders", message=frappe.get_traceback(e))
 		sales_orders = []
-		frappe.log_error(title = "Orders" , message = f"{orders_payload}")
 		while True:
 			if orders_payload:
 				orders_list = orders_payload.get("Orders")
@@ -1930,47 +1828,61 @@ class AmazonRepository:
 						if "HSN/SAC" in error_msg or "hsn_code" in error_msg.lower():
 							# Try to get the sales order to extract item information
 							try:
-								so_name = frappe.db.get_value("Sales Order", {"amazon_order_id": order_id}, "name")
+								so_name = frappe.db.get_value(
+									"Sales Order", {"amazon_order_id": order_id}, "name"
+								)
 								if so_name:
 									so_doc = frappe.get_doc("Sales Order", so_name)
-									enhanced_error = self.enhance_hsn_error_with_items(error_msg, so_doc)
-							except:
+									enhanced_error = self.enhance_hsn_error_with_items(
+										error_msg, so_doc
+									)
+							except Exception as e:
 								pass
-						
+
 						# Log error and skip this order, continue with next order
 						frappe.log_error(
 							title=f"Failed to sync Amazon Order: {order_id}",
-							message=f"Order ID: {order_id}\nError: {enhanced_error}\nTraceback: {frappe.get_traceback()}",
+							message=f"Order ID: {order_id}\nError: {enhanced_error}",
 						)
 						# Create failed sync record if it doesn't exist
-						if not frappe.db.exists("Amazon Failed Sync Record", {"amazon_order_id": order_id}):
+						if not frappe.db.exists(
+							"Amazon Failed Sync Record", {"amazon_order_id": order_id}
+						):
 							try:
-								failed_sync_record = frappe.new_doc('Amazon Failed Sync Record')
+								failed_sync_record = frappe.new_doc(
+									"Amazon Failed Sync Record"
+								)
 								failed_sync_record.amazon_order_id = order_id
-								failed_sync_record.remarks = f'Failed to sync order: {enhanced_error}'
+								failed_sync_record.remarks = (
+									f"Failed to sync order: {enhanced_error}"
+								)
 								if order.get("PurchaseDate"):
-									order_date = format_date_time_to_ist(order.get("PurchaseDate"))
-									failed_sync_record.amazon_order_date = getdate(order_date).strftime("%Y-%m-%d")
+									order_date = format_date_time_to_ist(
+										order.get("PurchaseDate")
+									)
+									failed_sync_record.amazon_order_date = getdate(
+										order_date
+									).strftime("%Y-%m-%d")
 								failed_sync_record.save(ignore_permissions=True)
 							except Exception as save_error:
 								frappe.log_error(
 									title=f"Failed to create Amazon Failed Sync Record for {order_id}",
-									message=str(save_error)
+									message=str(save_error),
 								)
 						continue
 				if not next_token:
 					break
 				orders_payload = self.call_sp_api_method(
-					sp_api_method=orders.get_orders, last_updated_after=last_updated_after, next_token=next_token,
+					sp_api_method=orders.get_orders,
+					last_updated_after=last_updated_after,
+					next_token=next_token,
 				)
 			else:
 				break
-		# Only enqueue if Sales Order creation is enabled (sales_orders contains SO names)
-		# If Sales Order creation is disabled, Sales Invoices are created directly and submitted if conditions are met
-		# Draft invoices will be picked up by enq_si_submit when called without sales_orders parameter
-		enable_sales_order_creation = getattr(self.amz_setting, 'enable_sales_order_creation', 1)
-		if enable_sales_order_creation:
-			frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", sales_orders=sales_orders)
+		frappe.enqueue(
+			"eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit",
+			sales_orders=sales_orders,
+		)
 		return sales_orders
 
 	def get_order(self, amazon_order_ids) -> list:
@@ -1980,7 +1892,7 @@ class AmazonRepository:
 			order_id=amazon_order_ids,
 		)
 		# order_call = orders.get_order(order_id=amazon_order_ids)
-		frappe.log_error(title = "Order Payload" , message = f"{order_payload}")
+		frappe.log_error(title="Order Payload", message=f"{order_payload}")
 		sales_orders = []
 		if order_payload:
 			order_id = order_payload.get("AmazonOrderId", amazon_order_ids)
@@ -1995,32 +1907,42 @@ class AmazonRepository:
 				if "HSN/SAC" in error_msg or "hsn_code" in error_msg.lower():
 					# Try to get the sales order to extract item information
 					try:
-						so_name = frappe.db.get_value("Sales Order", {"amazon_order_id": order_id}, "name")
+						so_name = frappe.db.get_value(
+							"Sales Order", {"amazon_order_id": order_id}, "name"
+						)
 						if so_name:
 							so_doc = frappe.get_doc("Sales Order", so_name)
-							enhanced_error = self.enhance_hsn_error_with_items(error_msg, so_doc)
-					except:
+							enhanced_error = self.enhance_hsn_error_with_items(
+								error_msg, so_doc
+							)
+					except Exception as e:
 						pass
-				
+
 				# Log error and skip this order
 				frappe.log_error(
 					title=f"Failed to sync Amazon Order: {order_id}",
-					message=f"Order ID: {order_id}\nError: {enhanced_error}\nTraceback: {frappe.get_traceback()}",
+					message=f"Order ID: {order_id}\nError: {enhanced_error}",
 				)
 				# Create failed sync record if it doesn't exist
-				if not frappe.db.exists("Amazon Failed Sync Record", {"amazon_order_id": order_id}):
+				if not frappe.db.exists(
+					"Amazon Failed Sync Record", {"amazon_order_id": order_id}
+				):
 					try:
-						failed_sync_record = frappe.new_doc('Amazon Failed Sync Record')
+						failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
 						failed_sync_record.amazon_order_id = order_id
 						failed_sync_record.remarks = enhanced_error
 						if order_payload.get("PurchaseDate"):
-							order_date = format_date_time_to_ist(order_payload.get("PurchaseDate"))
-							failed_sync_record.amazon_order_date = getdate(order_date).strftime("%Y-%m-%d")
+							order_date = format_date_time_to_ist(
+								order_payload.get("PurchaseDate")
+							)
+							failed_sync_record.amazon_order_date = getdate(
+								order_date
+							).strftime("%Y-%m-%d")
 						failed_sync_record.save(ignore_permissions=True)
 					except Exception as save_error:
 						frappe.log_error(
 							title=f"Failed to create Amazon Failed Sync Record for {order_id}",
-							message=str(save_error)
+							message=str(save_error),
 						)
 				# Re-throw with enhanced error message
 				frappe.throw(enhanced_error)
@@ -2030,57 +1952,68 @@ class AmazonRepository:
 	def get_catalog_items_instance(self) -> CatalogItems:
 		return CatalogItems(**self.instance_params)
 
+
 def to_iso_z(d):
-    # Accept either date (YYYY-MM-DD) or datetime
-    if isinstance(d, str):
-        # If it's already an ISO string with time, assume caller passed correct value
-        if "T" in d:
-            return d
-        # assume YYYY-MM-DD
-        d = datetime.strptime(d, "%Y-%m-%d").date()
-    if isinstance(d, date) and not isinstance(d, datetime):
-        # midnight UTC
-        dt = datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=timezone.utc)
-    else:
-        dt = d.astimezone(timezone.utc)
-    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+	# Accept either date (YYYY-MM-DD) or datetime
+	if isinstance(d, str):
+		# If it's already an ISO string with time, assume caller passed correct value
+		if "T" in d:
+			return d
+		# assume YYYY-MM-DD
+		d = datetime.strptime(d, "%Y-%m-%d").date()
+	if isinstance(d, date) and not isinstance(d, datetime):
+		# midnight UTC
+		dt = datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=timezone.utc)
+	else:
+		dt = d.astimezone(timezone.utc)
+	return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
 
 def get_orders(amz_setting_name, last_updated_after, sync_selected_date_only=0) -> list:
 	ar = AmazonRepository(amz_setting_name)
 	return ar.get_orders(last_updated_after, sync_selected_date_only)
+
 
 @frappe.whitelist()
 def get_order(amz_setting_name, amazon_order_ids) -> list:
 	ar = AmazonRepository(amz_setting_name)
 	return ar.get_order(amazon_order_ids)
 
+
 @frappe.whitelist()
 def create_stock_entry(sales_invoice):
-	'''
-		Method to create Stock entry for Returns and Replaced Orders
-	'''
+	"""
+	Method to create Stock entry for Returns and Replaced Orders
+	"""
 	stock_entry_created = False
-	if frappe.db.exists('Sales Invoice', sales_invoice):
-		si_doc = frappe.get_doc('Sales Invoice', sales_invoice)
-		stock_entry = frappe.new_doc('Stock Entry')
-		stock_entry.update({
-			"stock_entry_type": "Material Receipt",
-			"set_posting_time": 1,
-			"posting_date": si_doc.posting_date,
-			"posting_time": si_doc.posting_time,
-			"sales_invoice_no": si_doc.name,
-			"from_return_invoice": 1,
-			"remarks": "Stock updated to reflect return/replacement for Amazon Order {0}".format(si_doc.amazon_order_id),
-			"to_warehouse": si_doc.set_warehouse
-		})
+	if frappe.db.exists("Sales Invoice", sales_invoice):
+		si_doc = frappe.get_doc("Sales Invoice", sales_invoice)
+		stock_entry = frappe.new_doc("Stock Entry")
+		stock_entry.update(
+			{
+				"stock_entry_type": "Material Receipt",
+				"set_posting_time": 1,
+				"posting_date": si_doc.posting_date,
+				"posting_time": si_doc.posting_time,
+				"sales_invoice_no": si_doc.name,
+				"from_return_invoice": 1,
+				"remarks": "Stock updated to reflect return/replacement for Amazon Order {0}".format(
+					si_doc.amazon_order_id
+				),
+				"to_warehouse": si_doc.set_warehouse,
+			}
+		)
 
-		#Setting Items
+		# Setting Items
 		for item in si_doc.items:
-			stock_entry.append("items", {
-				"item_code": item.item_code,
-				"qty": item.qty,
-				"allow_zero_valuation_rate":1
-			})
+			stock_entry.append(
+				"items",
+				{
+					"item_code": item.item_code,
+					"qty": item.qty,
+					"allow_zero_valuation_rate": 1,
+				},
+			)
 
 		# Savepoint for rollback safety
 		frappe.db.savepoint("ghost_stocking")
@@ -2091,17 +2024,19 @@ def create_stock_entry(sales_invoice):
 		except Exception as e:
 			stock_entry_created = False
 			frappe.db.rollback(save_point="ghost_stocking")
-			frappe.get_doc({
-				"doctype": "Amazon Failed Invoice Record",
-				"invoice_id": sales_invoice,
-				"error": str(e),
-			}).insert()
+			frappe.get_doc(
+				{
+					"doctype": "Amazon Failed Invoice Record",
+					"invoice_id": sales_invoice,
+					"error": str(e),
+				}
+			).insert()
 	return stock_entry_created
+
 
 @frappe.whitelist()
 def create_stock_entries_for_sis(names):
-	"""method to bulk create stock entries for draft sales invoices
-	"""
+	"""method to bulk create stock entries for draft sales invoices"""
 	names = json.loads(names)
 	for name in names:
 		create_stock_entry(name)

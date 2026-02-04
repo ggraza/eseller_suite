@@ -1,9 +1,10 @@
 # Copyright (c) 2024, efeone and contributors
 # For license information, please see license.txt
 
-from requests import request
 import urllib.parse
+
 import frappe
+from requests import request
 
 __all__ = [
 	"SPAPIError",
@@ -63,6 +64,7 @@ MARKETPLACES = {
 
 # 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
+
 class SPAPIError(Exception):
 	"""
 	Main SP-API Exception class
@@ -73,8 +75,9 @@ class SPAPIError(Exception):
 		self.error_description = kwargs.get("error_description", "-")
 		super().__init__(*args)
 
+
 class SPAPI(object):
-	""" Base Amazon SP-API class """
+	"""Base Amazon SP-API class"""
 
 	# https://github.com/amzn/selling-partner-api-docs/blob/main/guides/en-US/developer-guide/SellingPartnerApiDeveloperGuide.md#connecting-to-the-selling-partner-api
 	AUTH_URL = "https://api.amazon.com/auth/o2/token"
@@ -92,14 +95,13 @@ class SPAPI(object):
 		self.client_secret = client_secret
 		self.refresh_token = refresh_token
 		self.country_code = country_code
-		self.region, self.endpoint, self.marketplace_id = Util.get_marketplace_data(country_code)
+		self.region, self.endpoint, self.marketplace_id = Util.get_marketplace_data(
+			country_code
+		)
 		# Store last request/response details for logging
 		self.last_request_details = None
-		
+
 	def get_access_token(self) -> str:
-		client_id = (self.client_id or "").strip()
-		client_secret = (self.client_secret or "").strip()
-		refresh_token = (self.refresh_token or "").strip()
 		data = {
 			"grant_type": "refresh_token",
 			"client_id": self.client_id,
@@ -107,62 +109,31 @@ class SPAPI(object):
 			"refresh_token": self.refresh_token,
 		}
 
-		headers = {
-			"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"
-		}
+		headers = {"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"}
 
-		# Use urlencode (percent-encodes reserved chars). This is fine in most cases.
 		encoded_body = urllib.parse.urlencode(data)
 
-		response = request(method="POST", url=self.AUTH_URL, data=encoded_body, headers=headers)
-
-		# Debug log to confirm what was actually sent (useful if still failing)
-		try:
-			sent_body = getattr(response.request, "body", None) or getattr(response.request, "data", None)
-			sent_headers = getattr(response.request, "headers", None)
-		except Exception:
-			sent_body, sent_headers = None, None
-
-		# frappe.log_error(
-		# 	title="Amazon Token Debug",
-		# 	message=f"Sent headers: {sent_headers}\nSent body: {sent_body}\nResp status: {response.status_code}\nResp body: {response.text}"
-		# )
+		response = request(
+			method="POST", url=self.AUTH_URL, data=encoded_body, headers=headers
+		)
 
 		result = response.json()
 		if response.status_code == 200:
 			# frappe.log_error(title="Amazon SP Token", message=f"{result}")
 			return result.get("access_token")
 
-		exception = SPAPIError(error=result.get("error"), error_description=result.get("error_description"))
+		exception = SPAPIError(
+			error=result.get("error"), error_description=result.get("error_description")
+		)
 		raise exception
-	# def get_access_token(self) -> str:
-	# 	data = {
-	# 		"grant_type": "refresh_token",
-	# 		"client_id": self.client_id,
-	# 		"client_secret": self.client_secret,
-	# 		"refresh_token": self.refresh_token,
-	# 	}
-
-	# 	headers = {
-	# 		'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-	# 	}
-	# 	# URL-encode each value (mimics curl --data-urlencode)
-	# 	# urllib.parse.urlencode will percent-encode reserved characters
-	# 	encoded_body = urllib.parse.urlencode(data)
-	# 	response = request(method="POST", url=self.AUTH_URL, data=encoded_body , headers = headers)
-	# 	result = response.json()
-	# 	if response.status_code == 200:
-	# 		frappe.log_error(title="Amazon SP Token" , message = f"{result}")
-	# 		return result.get("access_token")
-	# 	exception = SPAPIError(
-	# 		error=result.get("error"), error_description=result.get("error_description")
-	# 	)
-	# 	raise exception
 
 	def get_headers(self) -> dict:
 		return {"x-amz-access-token": self.get_access_token()}
 
-	def _mask_headers(headers: dict, hide_keys=("authorization", "x-amz-access-token", "x-amz-security-token")) -> dict:
+	def _mask_headers(
+		headers: dict,
+		hide_keys=("authorization", "x-amz-access-token", "x-amz-security-token"),
+	) -> dict:
 		"""Return a copy of headers with sensitive values masked for logging."""
 		masked = {}
 		for k, v in (headers or {}).items():
@@ -210,7 +181,7 @@ class SPAPI(object):
 						f"Data: {data}\n\n"
 						f"Status: {response.status_code}\n"
 						f"Response: {response.text}"
-					)
+					),
 				)
 				response.raise_for_status()
 
@@ -219,17 +190,17 @@ class SPAPI(object):
 				response_json = response.json()
 			except Exception:
 				response_json = {"error": "Failed to parse JSON", "text": response.text}
-			
+
 			self.last_request_details = {
 				"method": method,
-				"url": response.url if hasattr(response, 'url') else url,
+				"url": response.url if hasattr(response, "url") else url,
 				"headers": headers,
 				"params": params,
 				"data": data,
 				"status_code": str(response.status_code),
 				"response": response_json,
 			}
-			
+
 			return response_json
 
 		except Exception as e:
@@ -243,7 +214,7 @@ class SPAPI(object):
 					response_json = {"error": str(e), "text": response.text}
 			else:
 				response_json = {"error": str(e)}
-			
+
 			# Store request/response details even for errors
 			self.last_request_details = {
 				"method": method,
@@ -251,10 +222,14 @@ class SPAPI(object):
 				"headers": headers,
 				"params": params,
 				"data": data,
-				"status_code": str(getattr(response, 'status_code', 'N/A')) if "response" in locals() else "N/A",
+				"status_code": (
+					str(getattr(response, "status_code", "N/A"))
+					if "response" in locals()
+					else "N/A"
+				),
 				"response": response_json,
 			}
-			
+
 			frappe.log_error(
 				title="Amazon SP-API Exception",
 				message=(
@@ -264,7 +239,7 @@ class SPAPI(object):
 					f"Data: {data}\n\n"
 					f"Exception: {str(e)}{body}\n"
 					f"Traceback:\n{frappe.get_traceback()}"
-				)
+				),
 			)
 			# Re-raise so caller sees failure
 			raise
@@ -274,20 +249,23 @@ class SPAPI(object):
 			for idx in range(len(values)):
 				data[f"{key}[{idx}]"] = values[idx]
 
+
 class Finances(SPAPI):
-	""" Amazon Finances API """
+	"""Amazon Finances API"""
 
 	BASE_URI = "/finances/v0/"
 
 	def list_financial_events_by_order_id(
 		self, order_id: str, max_results: int = None, next_token: str = None
 	) -> dict:
-		""" Returns all financial events for the specified order. """
+		"""Returns all financial events for the specified order."""
 		append_to_base_uri = f"orders/{order_id}/financialEvents"
 		data = dict(MaxResultsPerPage=max_results, NextToken=next_token)
 		return self.make_request(append_to_base_uri=append_to_base_uri, params=data)
+
+
 class Orders(SPAPI):
-	""" Amazon Orders API """
+	"""Amazon Orders API"""
 
 	BASE_URI = "/orders/v0/orders"
 
@@ -311,7 +289,7 @@ class Orders(SPAPI):
 		is_ispu: bool = False,
 		store_chain_store_id: str = None,
 	) -> dict:
-		""" Returns orders created or updated during the time frame indicated by the specified parameters. You can also apply a range of filtering criteria to narrow the list of orders returned. If NextToken is present, that will be used to retrieve the orders instead of other criteria. """
+		"""Returns orders created or updated during the time frame indicated by the specified parameters. You can also apply a range of filtering criteria to narrow the list of orders returned. If NextToken is present, that will be used to retrieve the orders instead of other criteria."""
 		data = dict(
 			CreatedAfter=created_after,
 			CreatedBefore=created_before,
@@ -338,28 +316,33 @@ class Orders(SPAPI):
 			data["MarketplaceIds"] = marketplace_ids
 
 		if amazon_order_ids:
-			data['AmazonOrderIds'] = amazon_order_ids
+			data["AmazonOrderIds"] = amazon_order_ids
 
 		return self.make_request(params=data)
 
 	def get_order_items(self, order_id: str, next_token: str = None) -> dict:
-		""" Returns detailed order item information for the order indicated by the specified order ID. If NextToken is provided, it's used to retrieve the next page of order items. """
+		"""Returns detailed order item information for the order indicated by the specified order ID. If NextToken is provided, it's used to retrieve the next page of order items."""
 		append_to_base_uri = f"/{order_id}/orderItems"
 		data = dict(NextToken=next_token)
 		return self.make_request(append_to_base_uri=append_to_base_uri, params=data)
 
 	def get_order(self, order_id: str) -> dict:
-		""" Method to get a Particular Order """
+		"""Method to get a Particular Order"""
 		append_to_base_uri = f"/{order_id}"
 		return self.make_request(append_to_base_uri=append_to_base_uri)
 
+
 class CatalogItems(SPAPI):
-	""" Amazon Catalog Items API """
+	"""Amazon Catalog Items API"""
 
 	BASE_URI = "/catalog/2022-04-01"
 
-	def get_catalog_item(self, asin: str, marketplace_id: str = None,) -> dict:
-		""" Returns a specified item and its attributes. """
+	def get_catalog_item(
+		self,
+		asin: str,
+		marketplace_id: str = None,
+	) -> dict:
+		"""Returns a specified item and its attributes."""
 		if not marketplace_id:
 			marketplace_id = self.marketplace_id
 
@@ -368,13 +351,14 @@ class CatalogItems(SPAPI):
 
 		return self.make_request(append_to_base_uri=append_to_base_uri, params=data)
 
+
 class FulfillmentInbound(SPAPI):
-	""" Amazon Fulfillment Inbound API """
+	"""Amazon Fulfillment Inbound API"""
 
 	BASE_URI = "/fba/inbound/2024-03-20/"
 
 	def get_fulfillment_centers(self) -> dict:
-		""" Returns a list of fulfillment centers available to the seller. """
+		"""Returns a list of fulfillment centers available to the seller."""
 		# Note: This endpoint may not be available in all marketplaces or may require specific permissions
 		# Alternative: Fulfillment centers are often returned in shipment plans or other inbound operations
 		append_to_base_uri = "fulfillmentCenters"
@@ -382,12 +366,14 @@ class FulfillmentInbound(SPAPI):
 
 
 class SupplySources(SPAPI):
-	""" Amazon Supply Sources API """
+	"""Amazon Supply Sources API"""
 
 	BASE_URI = "/supplySources/2020-07-01/"
 
-	def get_supply_sources(self, page_size: int = 100, next_page_token: str = None) -> dict:
-		""" Returns a list of supply sources available to the seller. """
+	def get_supply_sources(
+		self, page_size: int = 100, next_page_token: str = None
+	) -> dict:
+		"""Returns a list of supply sources available to the seller."""
 		# Note: This endpoint may not be available in all marketplaces or may require specific permissions
 		append_to_base_uri = "supplySources"
 		params = {"pageSize": page_size}

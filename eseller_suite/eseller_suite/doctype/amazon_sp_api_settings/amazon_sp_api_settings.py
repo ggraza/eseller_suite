@@ -217,7 +217,7 @@ class AmazonSPAPISettings(Document):
 					supply_source_data = source
 					
 					if not warehouse_code:
-						errors.append(f"Missing warehouse code in center data: {center}")
+						errors.append(f"Missing warehouse code in center data: {source}")
 						continue
 					
 					# Check if warehouse already exists
@@ -278,7 +278,7 @@ class AmazonSPAPISettings(Document):
 					errors.append(error_msg)
 					frappe.log_error(
 						title="Error creating warehouse from Amazon",
-						message=f"{error_msg}\nCenter data: {frappe.as_json(center)}\nTraceback: {frappe.get_traceback()}"
+						message=f"{error_msg}\nCenter data: {frappe.as_json(source)}\nTraceback: {frappe.get_traceback()}"
 					)
 			
 			# Prepare response message
@@ -326,7 +326,7 @@ class AmazonSPAPISettings(Document):
 				if hasattr(e, 'response') and e.response is not None:
 					try:
 						response_text = e.response.text
-					except:
+					except Exception:
 						pass
 				
 				if "403" in str(e):
@@ -391,9 +391,9 @@ class AmazonSPAPISettings(Document):
 								if fulfillment_channel not in supply_sources:
 									supply_sources[fulfillment_channel] = set()
 								supply_sources[fulfillment_channel].add(supply_source)
-					except:
+					except Exception:
 						continue
-			except:
+			except Exception:
 				pass
 			
 			if not fulfillment_channels:

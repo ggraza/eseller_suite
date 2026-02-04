@@ -1,6 +1,6 @@
 import frappe
-from frappe import _
 from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+
 
 def after_install():
 	create_custom_fields(get_item_custom_fields(), ignore_validate=True)

@@ -27,7 +27,6 @@ class AmazonFailedSyncRecord(Document):
 							# Order/Invoice created successfully, delete the failed sync record
 							record_name = self.name
 							frappe.delete_doc(self.doctype, record_name, ignore_permissions=True, force=True)
-							frappe.db.commit()
 							return {"success": True, "message": "Order/Invoice created successfully. Failed sync record deleted."}
 				except Exception as e:
 					error_msg = str(e)
@@ -56,7 +55,7 @@ class AmazonFailedSyncRecord(Document):
 									self.save(ignore_permissions=True)
 									# Re-throw with enhanced message
 									frappe.throw(enhanced_error)
-						except Exception as enhance_error:
+						except Exception:
 							# If enhancement fails, just throw original error
 							pass
 					# Re-throw the original exception if not HSN error or enhancement failed
