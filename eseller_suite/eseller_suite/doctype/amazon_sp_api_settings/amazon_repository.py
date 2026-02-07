@@ -593,6 +593,13 @@ class AmazonRepository:
 
 	def create_sales_order(self, order) -> str | None:
 		def create_customer(order) -> str:
+			"""
+				Create customer based on Amazon order data. If amazon_customer is set in settings, use that. Otherwise, create/find customer based on AmazonOrderId
+			"""
+			if hasattr(self.amz_setting, 'amazon_customer') and self.amz_setting.amazon_customer:
+				if frappe.db.exists("Customer", self.amz_setting.amazon_customer):
+					return self.amz_setting.amazon_customer
+
 			order_customer_name = order.get("AmazonOrderId", "")
 
 			existing_customer_name = frappe.db.get_value(
