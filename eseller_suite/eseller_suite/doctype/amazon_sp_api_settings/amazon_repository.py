@@ -120,7 +120,6 @@ class AmazonRepository:
 	def call_sp_api_method(self, sp_api_method, **kwargs) -> dict:
 		errors = {}
 		max_retries = self.amz_setting.max_retry_limit
-		# enable_log = getattr(self.amz_setting, "enable_log", 0)
 
 		for x in range(max_retries):
 			try:
