@@ -2,7 +2,7 @@
  "actions": [],
  "allow_import": 1,
  "allow_rename": 1,
- "autoname": "field:state_code",
+ "autoname": "field:amazon_state",
  "creation": "2024-08-06 10:56:45.050491",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -33,13 +33,14 @@
   {
    "fieldname": "state_code",
    "fieldtype": "Data",
-   "label": "State Code",
-   "unique": 1
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "State Code"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-12-09 14:26:20.455911",
+ "modified": "2026-02-09 15:09:25.588942",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon State Mapping",
@@ -59,6 +60,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
