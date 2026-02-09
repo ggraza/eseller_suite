@@ -495,8 +495,23 @@ class AmazonRepository:
 		item.item_code = order_item["SellerSKU"]
 		item.is_actual_item = 1
 		item.is_sales_item = 1
-		item.item_name = order_item["SellerSKU"]
-		item.description = order_item["Title"]
+		item_name = order_item.get("Title", "") or order_item.get("SellerSKU", "")
+		item.item_name = item_name if len(item_name) <= 140 else item_name[:100] + "..."
+		item.description = order_item.get('Title', '')
+
+		#Setting stock uom and default uom to default stock uom from stock settings
+		default_stock_uom = frappe.db.get_single_value("Stock Settings", "stock_uom")
+		if default_stock_uom:
+			item.stock_uom = default_stock_uom
+			item.uom = default_stock_uom
+			item.append('uoms', {
+				'uom': default_stock_uom,
+				'conversion_factor': 1.0,
+			})
+
+		#Ignoring Validate and Mandatory to avoid HSN related errors during item creation, HSN can be added later from item master
+		item.flags.ignore_mandatory = True
+		item.flags.ignore_validate = True
 		item.insert(ignore_permissions=True)
 
 		create_item_price(amazon_item, item.item_code)
@@ -504,10 +519,27 @@ class AmazonRepository:
 		return item.name
 
 	def get_item_code(self, order_item, order_id) -> str:
+		item_code = None
 		if frappe.db.exists("Item", {"amazon_item_code": order_item["ASIN"]}):
 			return frappe.db.get_value("Item", {"amazon_item_code": order_item["ASIN"]})
-
-		item_code = self.create_item(order_item, order_id)
+		try:
+			item_code = self.create_item(order_item, order_id)
+		except Exception as e:
+			error_title = f"Item Creation Failed for Amazon Order : {order_id}"
+			error_message = f"Error creating item for SKU {order_item['SellerSKU']} and ASIN {order_item['ASIN']}: {str(e)}"
+			if not frappe.db.exists('Error Log', {'method': error_title, 'error': error_message}):
+				frappe.log_error(message=error_message, title=error_title)
+			frappe.msgprint(
+				f"Failed to create item for SKU {order_item['SellerSKU']}. Please check error logs for details.",
+				alert=True,
+				indicator="red",
+			)
+			# Record failed sync attempt
+			if not frappe.db.exists("Amazon Failed Sync Record", {"amazon_order_id": order_id}):
+				failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
+				failed_sync_record.amazon_order_id = order_id
+				failed_sync_record.remarks = error_message
+				failed_sync_record.save(ignore_permissions=True)
 		return item_code
 
 	def get_order_items(self, order_id) -> list:
@@ -647,7 +679,7 @@ class AmazonRepository:
 
 				return new_customer.name
 
-		def create_address(order, customer_name) -> str | None:
+		def create_address(order, customer_name, map_state_data=0) -> str | None:
 			shipping_address = order.get("ShippingAddress")
 
 			if not shipping_address:
@@ -659,9 +691,7 @@ class AmazonRepository:
 				)
 				make_address.city = shipping_address.get("City", "Not Provided")
 				amazon_state = shipping_address.get("StateOrRegion")
-				if frappe.db.get_single_value(
-					"Amazon SP API Settings", "map_state_data"
-				):
+				if map_state_data:
 					if frappe.db.exists(
 						"Amazon State Mapping", {"amazon_state": amazon_state}
 					):
@@ -1477,7 +1507,7 @@ class AmazonRepository:
 				so = frappe.get_doc("Sales Order", so_id)
 
 			customer_name = create_customer(order)
-			create_address(order, customer_name)
+			create_address(order, customer_name, self.amz_setting.map_state_data)
 
 			delivery_date = format_date_time_to_ist(order.get("LatestShipDate"))
 			transaction_date = format_date_time_to_ist(order.get("PurchaseDate"))
@@ -1899,7 +1929,7 @@ class AmazonRepository:
 			order_id=amazon_order_ids,
 		)
 		# order_call = orders.get_order(order_id=amazon_order_ids)
-		frappe.log_error(title="Order Payload", message=f"{order_payload}")
+		# frappe.log_error(title="Order Payload", message=f"{order_payload}")
 		sales_orders = []
 		if order_payload:
 			order_id = order_payload.get("AmazonOrderId", amazon_order_ids)
