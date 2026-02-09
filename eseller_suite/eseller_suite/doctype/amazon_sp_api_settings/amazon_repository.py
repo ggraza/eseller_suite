@@ -1016,6 +1016,19 @@ class AmazonRepository:
 			return_si = frappe.new_doc("Sales Invoice")
 			if existing_return_si:
 				return_si.amended_from = existing_return_si
+			# If there is a draft return invoice for the same order, delete it to avoid duplication
+			elif frappe.db.exists( "Sales Invoice", {
+					"amazon_order_id": order_id,
+					"docstatus": 0,
+					"is_return": 1,
+					"return_against": si,
+				}):
+				frappe.db.delete("Sales Invoice", {
+					"amazon_order_id": order_id,
+					"docstatus": 0,
+					"is_return": 1,
+					"return_against": si,
+				})
 			return_created = False
 			for refund in refunds:
 				if not frappe.db.exists(
@@ -1257,7 +1270,7 @@ class AmazonRepository:
 						return_created = True
 
 				# Add charges and fees if items were processed
-				if refund_items_processed:
+				if refund_items_processed or len(return_si.get('items', []))>0:
 					for charge in refund.get("charges", []):
 						return_si.append("taxes", charge)
 
@@ -1270,21 +1283,6 @@ class AmazonRepository:
 					return_si.disable_rounded_total = 1
 					return_si.update_outstanding_for_self = 1
 					return_si.update_billed_amount_in_sales_order = 1
-				else:
-					# If items were processed from TDS, add charges, fees, and TDS
-					if refund_items_processed:
-						for charge in refund.get("charges", []):
-							return_si.append("taxes", charge)
-
-						for fee in refund.get("fees", []):
-							return_si.append("taxes", fee)
-
-						for tds in refund.get("tds", []):
-							return_si.append("taxes", tds)
-
-						return_si.disable_rounded_total = 1
-						return_si.update_outstanding_for_self = 1
-						return_si.update_billed_amount_in_sales_order = 1
 
 			# Only insert and submit if items were created
 			if return_created and len(return_si.items) > 0:
