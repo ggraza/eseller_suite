@@ -331,6 +331,11 @@ class Orders(SPAPI):
 		append_to_base_uri = f"/{order_id}"
 		return self.make_request(append_to_base_uri=append_to_base_uri)
 
+	def get_buyer_info(self, order_id: str) -> dict:
+		"""Method to get Buyer Info for a Particular Order"""
+		append_to_base_uri = f"/{order_id}/buyerInfo"
+		return self.make_request(append_to_base_uri=append_to_base_uri)
+
 
 class CatalogItems(SPAPI):
 	"""Amazon Catalog Items API"""
@@ -346,7 +351,7 @@ class CatalogItems(SPAPI):
 		if not marketplace_id:
 			marketplace_id = self.marketplace_id
 
-		append_to_base_uri = f"/items/{asin}"
+		append_to_base_uri = f"/items/{asin}?marketplaceIds=A21TJRUUN4KGV&includedData=attributes"
 		data = dict(marketplaceIds=marketplace_id)
 
 		return self.make_request(append_to_base_uri=append_to_base_uri, params=data)

@@ -623,15 +623,16 @@ class AmazonRepository:
 		return final_order_items
 
 	def create_sales_order(self, order) -> str | None:
-		def create_customer(order) -> str:
+		def create_customer(order, customer_name=None) -> str:
 			"""
 				Create customer based on Amazon order data. If amazon_customer is set in settings, use that. Otherwise, create/find customer based on AmazonOrderId
 			"""
-			if hasattr(self.amz_setting, 'amazon_customer') and self.amz_setting.amazon_customer:
-				if frappe.db.exists("Customer", self.amz_setting.amazon_customer):
-					return self.amz_setting.amazon_customer
+			if not customer_name:
+				if hasattr(self.amz_setting, 'amazon_customer') and self.amz_setting.amazon_customer:
+					if frappe.db.exists("Customer", self.amz_setting.amazon_customer):
+						return self.amz_setting.amazon_customer
 
-			order_customer_name = order.get("AmazonOrderId", "")
+			order_customer_name = customer_name or order.get("AmazonOrderId", "")
 
 			existing_customer_name = frappe.db.get_value(
 				"Customer", filters={"name": order_customer_name}, fieldname="name"
@@ -730,6 +731,8 @@ class AmazonRepository:
 					"links", {"link_doctype": "Customer", "link_name": customer_name}
 				)
 				make_address.address_type = "Shipping"
+				make_address.is_primary_address = 1
+				make_address.is_shipping_address = 1
 				make_address.insert()
 
 		def get_refunds(self, order_id, order_date, amazon_order_amount=0) -> dict:
@@ -1310,9 +1313,6 @@ class AmazonRepository:
 			else:
 				so = frappe.get_doc("Sales Order", so_id)
 
-			customer_name = create_customer(order)
-			create_address(order, customer_name, self.amz_setting.map_state_data)
-
 			delivery_date = format_date_time_to_ist(order.get("LatestShipDate"))
 			transaction_date = format_date_time_to_ist(order.get("PurchaseDate"))
 
@@ -1321,10 +1321,23 @@ class AmazonRepository:
 			so.amazon_order_status = order.get("OrderStatus")
 			so.fulfillment_channel = order.get("FulfillmentChannel")
 			so.replaced_order_id = order.get("ReplacedOrderId") or ""
+			buyer_info = self.call_sp_api_method(
+				sp_api_method=self.get_orders_instance().get_buyer_info,
+				order_id=order_id
+			)
+			customer_name = ''
+			if buyer_info.get('BuyerTaxInfo', {}).get('CompanyLegalName'):
+				customer_name = buyer_info.get('BuyerTaxInfo', {}).get('CompanyLegalName')
+			customer = create_customer(order, customer_name)
+			if order.get("IsBusinessOrder"):
+				so.amazon_customer_type = "B2B"
+				create_address(order, customer, self.amz_setting.map_state_data)
+			else:
+				so.amazon_customer_type = "B2C"
 			if amazon_order_amount:
 				so.amazon_order_amount = amazon_order_amount
 			so.amazon_order_status = order.get("OrderStatus")
-			so.customer = customer_name
+			so.customer = customer
 			so.delivery_date = (
 				delivery_date
 				if getdate(delivery_date) > getdate(transaction_date)
@@ -1339,10 +1352,7 @@ class AmazonRepository:
 					warehouse = self.amz_setting.afn_warehouse
 			if self.amz_setting.temporary_stock_transfer_required:
 				warehouse = self.amz_setting.temporary_order_warehouse
-			if order.get("IsBusinessOrder"):
-				so.amazon_customer_type = "B2B"
-			else:
-				so.amazon_customer_type = "B2C"
+
 			so.set_warehouse = warehouse
 
 			items = self.get_order_items(order_id)
@@ -1534,7 +1544,6 @@ class AmazonRepository:
 					)
 
 			so.flags.ignore_mandatory = True
-			so.flags.ignore_validate = True
 			so.disable_rounded_total = 1
 			so.custom_validate()
 			if so.grand_total >= 0:
