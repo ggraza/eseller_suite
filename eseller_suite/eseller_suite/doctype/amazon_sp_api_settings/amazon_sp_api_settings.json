@@ -24,6 +24,7 @@
   "customer_group",
   "territory",
   "customer_type",
+  "amazon_customer",
   "market_place_account_group",
   "mfn_postage_fee_account_head",
   "section_break_3",
@@ -268,10 +269,16 @@
    "label": "MFN Postage Fee Account Head",
    "options": "Account",
    "reqd": 1
+  },
+  {
+   "fieldname": "amazon_customer",
+   "fieldtype": "Link",
+   "label": "Amazon Customer",
+   "options": "Customer"
   }
  ],
  "links": [],
- "modified": "2025-05-28 11:37:39.301083",
+ "modified": "2026-02-09 16:49:56.225137",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon SP API Settings",

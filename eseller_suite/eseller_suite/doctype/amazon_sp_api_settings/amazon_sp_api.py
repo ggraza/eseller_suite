@@ -1,6 +1,9 @@
 # Copyright (c) 2024, efeone and contributors
 # For license information, please see license.txt
 
+import urllib.parse
+
+import frappe
 from requests import request
 
 __all__ = [
@@ -8,6 +11,8 @@ __all__ = [
 	"Finances",
 	"Orders",
 	"CatalogItems",
+	"FulfillmentInbound",
+	"SupplySources",
 ]
 
 
@@ -59,6 +64,7 @@ MARKETPLACES = {
 
 # 3. Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
 
+
 class SPAPIError(Exception):
 	"""
 	Main SP-API Exception class
@@ -69,8 +75,9 @@ class SPAPIError(Exception):
 		self.error_description = kwargs.get("error_description", "-")
 		super().__init__(*args)
 
+
 class SPAPI(object):
-	""" Base Amazon SP-API class """
+	"""Base Amazon SP-API class"""
 
 	# https://github.com/amzn/selling-partner-api-docs/blob/main/guides/en-US/developer-guide/SellingPartnerApiDeveloperGuide.md#connecting-to-the-selling-partner-api
 	AUTH_URL = "https://api.amazon.com/auth/o2/token"
@@ -88,7 +95,9 @@ class SPAPI(object):
 		self.client_secret = client_secret
 		self.refresh_token = refresh_token
 		self.country_code = country_code
-		self.region, self.endpoint, self.marketplace_id = Util.get_marketplace_data(country_code)
+		self.region, self.endpoint, self.marketplace_id = Util.get_marketplace_data(
+			country_code
+		)
 
 	def get_access_token(self) -> str:
 		data = {
@@ -98,10 +107,18 @@ class SPAPI(object):
 			"refresh_token": self.refresh_token,
 		}
 
-		response = request(method="POST", url=self.AUTH_URL, data=data)
+		headers = {"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"}
+
+		encoded_body = urllib.parse.urlencode(data)
+
+		response = request(
+			method="POST", url=self.AUTH_URL, data=encoded_body, headers=headers
+		)
+
 		result = response.json()
 		if response.status_code == 200:
 			return result.get("access_token")
+
 		exception = SPAPIError(
 			error=result.get("error"), error_description=result.get("error_description")
 		)
@@ -110,8 +127,26 @@ class SPAPI(object):
 	def get_headers(self) -> dict:
 		return {"x-amz-access-token": self.get_access_token()}
 
+	def _mask_headers(
+		headers: dict,
+		hide_keys=("authorization", "x-amz-access-token", "x-amz-security-token"),
+	) -> dict:
+		"""Return a copy of headers with sensitive values masked for logging."""
+		masked = {}
+		for k, v in (headers or {}).items():
+			lk = k.lower()
+			if any(h in lk for h in hide_keys):
+				masked[k] = "***MASKED***"
+			else:
+				masked[k] = v
+		return masked
+
 	def make_request(
-		self, method: str = "GET", append_to_base_uri: str = "", params: dict = None, data: dict = None,
+		self,
+		method: str = "GET",
+		append_to_base_uri: str = "",
+		params: dict = None,
+		data: dict = None,
 	) -> dict:
 		if isinstance(params, dict):
 			params = Util.remove_empty(params)
@@ -119,35 +154,90 @@ class SPAPI(object):
 			data = Util.remove_empty(data)
 
 		url = self.endpoint + self.BASE_URI + append_to_base_uri
+		headers = self.get_headers()
 
-		response = request(
-			method=method,
-			url=url,
-			params=params,
-			data=data,
-			headers=self.get_headers()
-		)
-		return response.json()
+		try:
+			response = request(
+				method=method,
+				url=url,
+				params=params,
+				data=data,
+				headers=headers,
+				timeout=30,  # optional but safer
+			)
+
+			# Log request + response if not 2xx
+			if response.status_code < 200 or response.status_code >= 300:
+				frappe.log_error(
+					title="Amazon SP-API Request Error",
+					message=(
+						f"METHOD: {method}\n"
+						f"URL: {response.url}\n"
+						f"Headers: {headers}\n"
+						f"Params: {params}\n"
+						f"Data: {data}\n\n"
+						f"Status: {response.status_code}\n"
+						f"Response: {response.text}"
+					),
+				)
+				response.raise_for_status()
+
+			# Store request/response details for logging
+			try:
+				response_json = response.json()
+			except Exception:
+				response_json = {"error": "Failed to parse JSON", "text": response.text}
+
+			return response_json
+
+		except Exception as e:
+			# Capture traceback + partial response (if any)
+			body = ""
+			if "response" in locals():
+				body = f"\nStatus: {response.status_code}\nResponse: {response.text}"
+				try:
+					response_json = response.json()
+				except Exception:
+					response_json = {"error": str(e), "text": response.text}
+			else:
+				response_json = {"error": str(e)}
+
+			frappe.log_error(
+				title="Amazon SP-API Exception",
+				message=(
+					f"METHOD: {method}\n"
+					f"URL: {url}\n"
+					f"Params: {params}\n"
+					f"Data: {data}\n\n"
+					f"Exception: {str(e)}{body}\n"
+					f"Traceback:\n{frappe.get_traceback()}"
+				),
+			)
+			# Re-raise so caller sees failure
+			raise
 
 	def list_to_dict(self, key: str, values: list, data: dict) -> None:
 		if values and isinstance(values, list):
 			for idx in range(len(values)):
 				data[f"{key}[{idx}]"] = values[idx]
 
+
 class Finances(SPAPI):
-	""" Amazon Finances API """
+	"""Amazon Finances API"""
 
 	BASE_URI = "/finances/v0/"
 
 	def list_financial_events_by_order_id(
 		self, order_id: str, max_results: int = None, next_token: str = None
 	) -> dict:
-		""" Returns all financial events for the specified order. """
+		"""Returns all financial events for the specified order."""
 		append_to_base_uri = f"orders/{order_id}/financialEvents"
 		data = dict(MaxResultsPerPage=max_results, NextToken=next_token)
 		return self.make_request(append_to_base_uri=append_to_base_uri, params=data)
+
+
 class Orders(SPAPI):
-	""" Amazon Orders API """
+	"""Amazon Orders API"""
 
 	BASE_URI = "/orders/v0/orders"
 
@@ -171,7 +261,7 @@ class Orders(SPAPI):
 		is_ispu: bool = False,
 		store_chain_store_id: str = None,
 	) -> dict:
-		""" Returns orders created or updated during the time frame indicated by the specified parameters. You can also apply a range of filtering criteria to narrow the list of orders returned. If NextToken is present, that will be used to retrieve the orders instead of other criteria. """
+		"""Returns orders created or updated during the time frame indicated by the specified parameters. You can also apply a range of filtering criteria to narrow the list of orders returned. If NextToken is present, that will be used to retrieve the orders instead of other criteria."""
 		data = dict(
 			CreatedAfter=created_after,
 			CreatedBefore=created_before,
@@ -198,35 +288,75 @@ class Orders(SPAPI):
 			data["MarketplaceIds"] = marketplace_ids
 
 		if amazon_order_ids:
-			data['AmazonOrderIds'] = amazon_order_ids
+			data["AmazonOrderIds"] = amazon_order_ids
 
 		return self.make_request(params=data)
 
 	def get_order_items(self, order_id: str, next_token: str = None) -> dict:
-		""" Returns detailed order item information for the order indicated by the specified order ID. If NextToken is provided, it's used to retrieve the next page of order items. """
+		"""Returns detailed order item information for the order indicated by the specified order ID. If NextToken is provided, it's used to retrieve the next page of order items."""
 		append_to_base_uri = f"/{order_id}/orderItems"
 		data = dict(NextToken=next_token)
 		return self.make_request(append_to_base_uri=append_to_base_uri, params=data)
 
 	def get_order(self, order_id: str) -> dict:
-		""" Method to get a Particular Order """
+		"""Method to get a Particular Order"""
 		append_to_base_uri = f"/{order_id}"
 		return self.make_request(append_to_base_uri=append_to_base_uri)
 
+	def get_buyer_info(self, order_id: str) -> dict:
+		"""Method to get Buyer Info for a Particular Order"""
+		append_to_base_uri = f"/{order_id}/buyerInfo"
+		return self.make_request(append_to_base_uri=append_to_base_uri)
+
+
 class CatalogItems(SPAPI):
-	""" Amazon Catalog Items API """
+	"""Amazon Catalog Items API"""
 
-	BASE_URI = "/catalog/v0"
+	BASE_URI = "/catalog/2022-04-01"
 
-	def get_catalog_item(self, asin: str, marketplace_id: str = None,) -> dict:
-		""" Returns a specified item and its attributes. """
+	def get_catalog_item(
+		self,
+		asin: str,
+		marketplace_id: str = None,
+	) -> dict:
+		"""Returns a specified item and its attributes."""
 		if not marketplace_id:
 			marketplace_id = self.marketplace_id
 
-		append_to_base_uri = f"/items/{asin}"
-		data = dict(MarketplaceId=marketplace_id)
+		append_to_base_uri = f"/items/{asin}?marketplaceIds=A21TJRUUN4KGV&includedData=attributes"
+		data = dict(marketplaceIds=marketplace_id)
 
 		return self.make_request(append_to_base_uri=append_to_base_uri, params=data)
+
+
+class FulfillmentInbound(SPAPI):
+	"""Amazon Fulfillment Inbound API"""
+
+	BASE_URI = "/fba/inbound/2024-03-20/"
+
+	def get_fulfillment_centers(self) -> dict:
+		"""Returns a list of fulfillment centers available to the seller."""
+		# Note: This endpoint may not be available in all marketplaces or may require specific permissions
+		# Alternative: Fulfillment centers are often returned in shipment plans or other inbound operations
+		append_to_base_uri = "fulfillmentCenters"
+		return self.make_request(append_to_base_uri=append_to_base_uri)
+
+
+class SupplySources(SPAPI):
+	"""Amazon Supply Sources API"""
+
+	BASE_URI = "/supplySources/2020-07-01/"
+
+	def get_supply_sources(
+		self, page_size: int = 100, next_page_token: str = None
+	) -> dict:
+		"""Returns a list of supply sources available to the seller."""
+		# Note: This endpoint may not be available in all marketplaces or may require specific permissions
+		append_to_base_uri = "supplySources"
+		params = {"pageSize": page_size}
+		if next_page_token:
+			params["nextPageToken"] = next_page_token
+		return self.make_request(append_to_base_uri=append_to_base_uri, params=params)
 
 
 class Util:
