@@ -98,8 +98,6 @@ class SPAPI(object):
 		self.region, self.endpoint, self.marketplace_id = Util.get_marketplace_data(
 			country_code
 		)
-		# Store last request/response details for logging
-		self.last_request_details = None
 
 	def get_access_token(self) -> str:
 		data = {
@@ -119,7 +117,6 @@ class SPAPI(object):
 
 		result = response.json()
 		if response.status_code == 200:
-			# frappe.log_error(title="Amazon SP Token", message=f"{result}")
 			return result.get("access_token")
 
 		exception = SPAPIError(
@@ -191,16 +188,6 @@ class SPAPI(object):
 			except Exception:
 				response_json = {"error": "Failed to parse JSON", "text": response.text}
 
-			self.last_request_details = {
-				"method": method,
-				"url": response.url if hasattr(response, "url") else url,
-				"headers": headers,
-				"params": params,
-				"data": data,
-				"status_code": str(response.status_code),
-				"response": response_json,
-			}
-
 			return response_json
 
 		except Exception as e:
@@ -214,21 +201,6 @@ class SPAPI(object):
 					response_json = {"error": str(e), "text": response.text}
 			else:
 				response_json = {"error": str(e)}
-
-			# Store request/response details even for errors
-			self.last_request_details = {
-				"method": method,
-				"url": url,
-				"headers": headers,
-				"params": params,
-				"data": data,
-				"status_code": (
-					str(getattr(response, "status_code", "N/A"))
-					if "response" in locals()
-					else "N/A"
-				),
-				"response": response_json,
-			}
 
 			frappe.log_error(
 				title="Amazon SP-API Exception",
