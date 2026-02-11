@@ -10,6 +10,7 @@ def after_install():
 	create_custom_fields(get_journal_entry_custom_fields(), ignore_validate=True)
 	create_custom_fields(get_purchase_receipt_custom_fields(), ignore_validate=True)
 	create_custom_fields(get_stock_entry_custom_fields(), ignore_validate=True)
+	create_custom_fields(get_warehouse_custom_fields(), ignore_validate=True)
 
 	# Creating Property setters
 	create_property_setters(get_purchase_receipt_item_property_setters())
@@ -27,6 +28,8 @@ def before_uninstall():
 	delete_custom_fields(get_purchase_invoice_custom_fields())
 	delete_custom_fields(get_journal_entry_custom_fields())
 	delete_custom_fields(get_purchase_receipt_custom_fields())
+	delete_custom_fields(get_stock_entry_custom_fields())
+	delete_custom_fields(get_warehouse_custom_fields())
 
 def delete_custom_fields(custom_fields: dict):
 	'''
@@ -46,8 +49,8 @@ def delete_custom_fields(custom_fields: dict):
 
 def get_item_custom_fields():
 	'''
-        eSeller Suite specific custom fields in Item
-    '''
+		eSeller Suite specific custom fields in Item
+	'''
 	return {
 		"Item": [
 			{
@@ -90,8 +93,8 @@ def get_item_custom_fields():
 
 def get_sales_order_custom_fields():
 	'''
-        eSeller Suite specific custom fields in Sales Order
-    '''
+		eSeller Suite specific custom fields in Sales Order
+	'''
 	return {
 		"Sales Order": [
 			{
@@ -199,13 +202,13 @@ def get_sales_order_custom_fields():
 				"no_copy": 1,
 				"in_list_view":1
 			}
-        ]
+		]
 	}
 
 def get_sales_invoice_custom_fields():
 	'''
-        eSeller Suite specific custom fields in Sales Invoice
-    '''
+		eSeller Suite specific custom fields in Sales Invoice
+	'''
 	return {
 		"Sales Invoice": [
 			{
@@ -243,7 +246,7 @@ def get_sales_invoice_custom_fields():
 				"no_copy": 1,
 				"options": "\nB2B\nB2C"
 			},
-            {
+			{
 				"fieldname": "fulfillment_channel",
 				"fieldtype": "Select",
 				"label": "Fulfillment Channel",
@@ -341,8 +344,8 @@ def get_sales_invoice_custom_fields():
 
 def get_purchase_invoice_custom_fields():
 	'''
-        eSeller Suite specific custom fields in Purchase Invoice
-    '''
+		eSeller Suite specific custom fields in Purchase Invoice
+	'''
 	return {
 		"Purchase Invoice": [
 			{
@@ -447,13 +450,13 @@ def get_purchase_invoice_custom_fields():
 				"read_only": 1,
 				"no_copy": 1
 			}
-        ]
+		]
 	}
 
 def get_journal_entry_custom_fields():
 	'''
-        eSeller Suite specific custom fields in Journal Entry
-    '''
+		eSeller Suite specific custom fields in Journal Entry
+	'''
 	return {
 		"Journal Entry": [
 			{
@@ -479,8 +482,8 @@ def get_journal_entry_custom_fields():
 	}
 
 def get_purchase_receipt_custom_fields():
-    """eSeller Suite specific custom fields in Purchase Receipt"""
-    return {
+	"""eSeller Suite specific custom fields in Purchase Receipt"""
+	return {
 		"Purchase Receipt Item": [
 			{
 				"fieldname": "new_seral_section",
@@ -500,7 +503,7 @@ def get_purchase_receipt_custom_fields():
 	}
 
 def get_stock_entry_custom_fields():
-    return {
+	return {
 		"Stock Entry Detail": [
 			{
 				"fieldname": "new_seral_section",
@@ -543,25 +546,25 @@ def create_property_setters(property_setter_datas):
 		property_setter.insert()
 
 def get_purchase_receipt_item_property_setters():
-    return [
-        {
+	return [
+		{
 			"doctype_or_field": "DocField",
 			"doc_type": "Purchase Receipt Item",
 			"field_name": "section_break_45",
 			"property": "hidden",
 			"value": 1
 		},
-        {
+		{
 			"doctype_or_field": "DocField",
 			"doc_type": "Purchase Receipt Item",
 			"field_name": "section_break_3vxt",
 			"property": "hidden",
 			"value": 1
 		},
-    ]
+	]
 
 def get_stock_entry_detail_property_setters():
-    return [
+	return [
 		{
 			"doctype_or_field": "DocField",
 			"doc_type": "Stock Entry Detail",
@@ -569,7 +572,7 @@ def get_stock_entry_detail_property_setters():
 			"property": "hidden",
 			"value": 1
 		},
-        {
+		{
 			"doctype_or_field": "DocField",
 			"doc_type": "Stock Entry Detail",
 			"field_name": "section_break_rdtg",
@@ -579,7 +582,7 @@ def get_stock_entry_detail_property_setters():
 	]
 
 def get_stock_entry_property_setters():
-    return [
+	return [
 		{
 			"doctype_or_field": "DocField",
 			"doc_type": "Stock Entry",
@@ -604,7 +607,7 @@ def get_stock_entry_property_setters():
 	]
 
 def get_item_property_setters():
-    return [
+	return [
 		{
 			"doctype_or_field": "DocField",
 			"doc_type": "Item",
@@ -669,3 +672,21 @@ def get_item_property_setters():
 			"value": "is_actual_item"
 		}
 	]
+
+def get_warehouse_custom_fields():
+	'''
+		eSeller Suite specific custom fields in Warehouse
+	'''
+	return {
+		"Warehouse": [
+			{
+				"fieldname": "amazon_warehouse_code",
+				"fieldtype": "Data",
+				"label": "Amazon Warehouse Code",
+				"insert_after": "mobile_no",
+				"unique": 1,
+				"in_list_view": 1,
+				"in_standard_filter": 1,
+			},
+		]
+	}
