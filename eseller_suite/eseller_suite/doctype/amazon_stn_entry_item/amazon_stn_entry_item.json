@@ -1,0 +1,306 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-11 13:19:42.345129",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "target_gstin",
+  "transaction_type",
+  "transaction_id",
+  "order_id",
+  "source_fc",
+  "source_fc_city",
+  "source_fc_state",
+  "source_fc_pin",
+  "column_break_honq",
+  "target_fc",
+  "target_fc_city",
+  "target_fc_state",
+  "target_fc_pin",
+  "invoice_number",
+  "invoice_date",
+  "invoice_time",
+  "invoice_date_str",
+  "section_break_njqz",
+  "invoice_value",
+  "asin",
+  "qty",
+  "hsn_code",
+  "taxable_value",
+  "column_break_oyne",
+  "igst_rate",
+  "igst_amount",
+  "source_gstin",
+  "irn_number",
+  "irn_filing_status",
+  "irn_date",
+  "processed_data_section",
+  "source_company",
+  "source_warehouse",
+  "item",
+  "column_break_knyi",
+  "target_company",
+  "target_warehouse",
+  "ready_to_process",
+  "transactions_created",
+  "transaction_references_section",
+  "sales_invoice",
+  "purchase_invoice",
+  "stock_entry",
+  "column_break_wozl",
+  "error_log"
+ ],
+ "fields": [
+  {
+   "fieldname": "target_gstin",
+   "fieldtype": "Data",
+   "label": "Target GSTIN"
+  },
+  {
+   "fieldname": "transaction_type",
+   "fieldtype": "Data",
+   "label": "Transaction Type"
+  },
+  {
+   "fieldname": "transaction_id",
+   "fieldtype": "Data",
+   "label": "Transaction ID"
+  },
+  {
+   "fieldname": "order_id",
+   "fieldtype": "Data",
+   "label": "Order ID"
+  },
+  {
+   "fieldname": "source_fc",
+   "fieldtype": "Data",
+   "label": "Source FC"
+  },
+  {
+   "fieldname": "source_fc_city",
+   "fieldtype": "Data",
+   "label": "Source FC City"
+  },
+  {
+   "fieldname": "source_fc_state",
+   "fieldtype": "Data",
+   "label": "Source FC State"
+  },
+  {
+   "fieldname": "source_fc_pin",
+   "fieldtype": "Data",
+   "label": "Source FC PIN"
+  },
+  {
+   "fieldname": "target_fc",
+   "fieldtype": "Data",
+   "label": "Target FC"
+  },
+  {
+   "fieldname": "target_fc_city",
+   "fieldtype": "Data",
+   "label": "Target FC City"
+  },
+  {
+   "fieldname": "target_fc_state",
+   "fieldtype": "Data",
+   "label": "Target FC State"
+  },
+  {
+   "fieldname": "target_fc_pin",
+   "fieldtype": "Data",
+   "label": "Target FC PIN"
+  },
+  {
+   "fieldname": "column_break_honq",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "invoice_number",
+   "fieldtype": "Data",
+   "label": "Invoice Number"
+  },
+  {
+   "fieldname": "invoice_date",
+   "fieldtype": "Date",
+   "label": "Invoice Date"
+  },
+  {
+   "fieldname": "invoice_time",
+   "fieldtype": "Time",
+   "label": "Invoice Time"
+  },
+  {
+   "fieldname": "section_break_njqz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "invoice_value",
+   "fieldtype": "Currency",
+   "label": "Invoice Value"
+  },
+  {
+   "fieldname": "asin",
+   "fieldtype": "Data",
+   "label": "ASIN"
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Qty"
+  },
+  {
+   "fieldname": "hsn_code",
+   "fieldtype": "Data",
+   "label": "HSN Code"
+  },
+  {
+   "fieldname": "taxable_value",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Taxable Value"
+  },
+  {
+   "fieldname": "column_break_oyne",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "igst_rate",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "IGST Rate"
+  },
+  {
+   "fieldname": "igst_amount",
+   "fieldtype": "Currency",
+   "label": "IGST Amount"
+  },
+  {
+   "fieldname": "source_gstin",
+   "fieldtype": "Data",
+   "label": "Source GSTIN"
+  },
+  {
+   "fieldname": "irn_number",
+   "fieldtype": "Data",
+   "label": "IRN Number"
+  },
+  {
+   "fieldname": "irn_filing_status",
+   "fieldtype": "Data",
+   "label": "IRN Filing Status"
+  },
+  {
+   "fieldname": "irn_date",
+   "fieldtype": "Data",
+   "label": "IRN Date"
+  },
+  {
+   "fieldname": "source_company",
+   "fieldtype": "Link",
+   "label": "Source Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "label": "Source Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "column_break_knyi",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "target_company",
+   "fieldtype": "Link",
+   "label": "Target Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "target_warehouse",
+   "fieldtype": "Link",
+   "label": "Target Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item"
+  },
+  {
+   "default": "0",
+   "fieldname": "ready_to_process",
+   "fieldtype": "Check",
+   "label": "Ready to Process"
+  },
+  {
+   "default": "0",
+   "fieldname": "transactions_created",
+   "fieldtype": "Check",
+   "label": "Transactions Created"
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice"
+  },
+  {
+   "fieldname": "purchase_invoice",
+   "fieldtype": "Link",
+   "label": "Purchase Invoice",
+   "options": "Purchase Invoice"
+  },
+  {
+   "fieldname": "column_break_wozl",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stock_entry",
+   "fieldtype": "Link",
+   "label": "Stock Entry",
+   "options": "Stock Entry"
+  },
+  {
+   "fieldname": "error_log",
+   "fieldtype": "Long Text",
+   "label": "Error Log"
+  },
+  {
+   "fieldname": "transaction_references_section",
+   "fieldtype": "Section Break",
+   "label": "Transaction References"
+  },
+  {
+   "fieldname": "processed_data_section",
+   "fieldtype": "Section Break",
+   "label": "Processed Data"
+  },
+  {
+   "fieldname": "invoice_date_str",
+   "fieldtype": "Data",
+   "label": "Invoice Date (Str)"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-02-12 11:58:24.501102",
+ "modified_by": "Administrator",
+ "module": "eSeller Suite",
+ "name": "Amazon STN Entry Item",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
