@@ -22,6 +22,7 @@
   "invoice_number",
   "invoice_date",
   "invoice_time",
+  "invoice_date_str",
   "section_break_njqz",
   "invoice_value",
   "asin",
@@ -85,7 +86,7 @@
   {
    "fieldname": "source_fc_state",
    "fieldtype": "Data",
-   "label": "Source FC State "
+   "label": "Source FC State"
   },
   {
    "fieldname": "source_fc_pin",
@@ -110,7 +111,7 @@
   {
    "fieldname": "target_fc_pin",
    "fieldtype": "Data",
-   "label": "Target FC PIN "
+   "label": "Target FC PIN"
   },
   {
    "fieldname": "column_break_honq",
@@ -119,12 +120,12 @@
   {
    "fieldname": "invoice_number",
    "fieldtype": "Data",
-   "label": "Invoice Number "
+   "label": "Invoice Number"
   },
   {
    "fieldname": "invoice_date",
    "fieldtype": "Date",
-   "label": "Invoice Date "
+   "label": "Invoice Date"
   },
   {
    "fieldname": "invoice_time",
@@ -154,7 +155,7 @@
   {
    "fieldname": "hsn_code",
    "fieldtype": "Data",
-   "label": "HSN Code "
+   "label": "HSN Code"
   },
   {
    "fieldname": "taxable_value",
@@ -170,7 +171,7 @@
    "fieldname": "igst_rate",
    "fieldtype": "Percent",
    "in_list_view": 1,
-   "label": "IGST Rate "
+   "label": "IGST Rate"
   },
   {
    "fieldname": "igst_amount",
@@ -200,13 +201,13 @@
   {
    "fieldname": "source_company",
    "fieldtype": "Link",
-   "label": "Source Company ",
+   "label": "Source Company",
    "options": "Company"
   },
   {
    "fieldname": "source_warehouse",
    "fieldtype": "Link",
-   "label": "Source Warehouse ",
+   "label": "Source Warehouse",
    "options": "Warehouse"
   },
   {
@@ -222,7 +223,7 @@
   {
    "fieldname": "target_warehouse",
    "fieldtype": "Link",
-   "label": "Target Warehouse ",
+   "label": "Target Warehouse",
    "options": "Warehouse"
   },
   {
@@ -236,7 +237,7 @@
    "default": "0",
    "fieldname": "ready_to_process",
    "fieldtype": "Check",
-   "label": "Ready to Process "
+   "label": "Ready to Process"
   },
   {
    "default": "0",
@@ -269,7 +270,7 @@
   {
    "fieldname": "error_log",
    "fieldtype": "Long Text",
-   "label": "Error Log "
+   "label": "Error Log"
   },
   {
    "fieldname": "transaction_references_section",
@@ -280,13 +281,18 @@
    "fieldname": "processed_data_section",
    "fieldtype": "Section Break",
    "label": "Processed Data"
+  },
+  {
+   "fieldname": "invoice_date_str",
+   "fieldtype": "Data",
+   "label": "Invoice Date (Str)"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-02-11 14:35:34.022764",
+ "modified": "2026-02-12 11:58:24.501102",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon STN Entry Item",
