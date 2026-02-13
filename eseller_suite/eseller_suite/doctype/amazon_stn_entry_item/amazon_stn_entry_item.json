@@ -6,35 +6,40 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "target_gstin",
+  "transaction_details_section",
   "transaction_type",
   "transaction_id",
   "order_id",
+  "column_break_zsnn",
+  "invoice_number",
+  "invoice_date_str",
+  "source_target_details_section",
+  "source_gstin",
   "source_fc",
   "source_fc_city",
   "source_fc_state",
   "source_fc_pin",
-  "column_break_honq",
+  "column_break_tekx",
+  "target_gstin",
   "target_fc",
   "target_fc_city",
   "target_fc_state",
   "target_fc_pin",
-  "invoice_number",
-  "invoice_date",
-  "invoice_time",
-  "invoice_date_str",
-  "section_break_njqz",
+  "section_break_hiok",
   "invoice_value",
   "asin",
   "qty",
   "hsn_code",
   "taxable_value",
-  "column_break_oyne",
+  "column_break_honq",
+  "invoice_time",
+  "invoice_date",
   "igst_rate",
   "igst_amount",
-  "source_gstin",
+  "section_break_njqz",
   "irn_number",
   "irn_filing_status",
+  "column_break_oyne",
   "irn_date",
   "processed_data_section",
   "source_company",
@@ -61,12 +66,14 @@
   {
    "fieldname": "transaction_type",
    "fieldtype": "Data",
-   "label": "Transaction Type"
+   "label": "Transaction Type",
+   "reqd": 1
   },
   {
    "fieldname": "transaction_id",
    "fieldtype": "Data",
-   "label": "Transaction ID"
+   "label": "Transaction ID",
+   "reqd": 1
   },
   {
    "fieldname": "order_id",
@@ -134,7 +141,8 @@
   },
   {
    "fieldname": "section_break_njqz",
-   "fieldtype": "Section Break"
+   "fieldtype": "Section Break",
+   "label": "IRN Details"
   },
   {
    "fieldname": "invoice_value",
@@ -198,11 +206,11 @@
   {
    "fieldname": "source_company",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "label": "Source Company",
    "options": "Company"
   },
   {
+   "columns": 2,
    "fieldname": "source_warehouse",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -216,11 +224,11 @@
   {
    "fieldname": "target_company",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "label": "Target Company",
    "options": "Company"
   },
   {
+   "columns": 2,
    "fieldname": "target_warehouse",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -230,10 +238,12 @@
   {
    "fieldname": "item",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Item",
    "options": "Item"
   },
   {
+   "columns": 2,
    "default": "0",
    "fieldname": "ready_to_process",
    "fieldtype": "Check",
@@ -241,9 +251,11 @@
    "label": "Ready to Process"
   },
   {
+   "columns": 2,
    "default": "0",
    "fieldname": "transactions_created",
    "fieldtype": "Check",
+   "in_list_view": 1,
    "label": "Transactions Created"
   },
   {
@@ -287,13 +299,36 @@
    "fieldname": "invoice_date_str",
    "fieldtype": "Data",
    "label": "Invoice Date (Str)"
+  },
+  {
+   "fieldname": "section_break_hiok",
+   "fieldtype": "Section Break",
+   "label": "Invoice Details"
+  },
+  {
+   "fieldname": "transaction_details_section",
+   "fieldtype": "Section Break",
+   "label": "Transaction Details"
+  },
+  {
+   "fieldname": "column_break_zsnn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_tekx",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "source_target_details_section",
+   "fieldtype": "Section Break",
+   "label": "Source & Target Details"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-02-13 09:02:41.600784",
+ "modified": "2026-02-13 09:50:40.971175",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon STN Entry Item",
