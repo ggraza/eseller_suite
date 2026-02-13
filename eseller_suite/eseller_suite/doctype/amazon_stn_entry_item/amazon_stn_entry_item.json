@@ -149,7 +149,6 @@
   {
    "fieldname": "qty",
    "fieldtype": "Float",
-   "in_list_view": 1,
    "label": "Qty"
   },
   {
@@ -160,7 +159,6 @@
   {
    "fieldname": "taxable_value",
    "fieldtype": "Currency",
-   "in_list_view": 1,
    "label": "Taxable Value"
   },
   {
@@ -170,7 +168,6 @@
   {
    "fieldname": "igst_rate",
    "fieldtype": "Percent",
-   "in_list_view": 1,
    "label": "IGST Rate"
   },
   {
@@ -201,12 +198,14 @@
   {
    "fieldname": "source_company",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Source Company",
    "options": "Company"
   },
   {
    "fieldname": "source_warehouse",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Source Warehouse",
    "options": "Warehouse"
   },
@@ -217,19 +216,20 @@
   {
    "fieldname": "target_company",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Target Company",
    "options": "Company"
   },
   {
    "fieldname": "target_warehouse",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Target Warehouse",
    "options": "Warehouse"
   },
   {
    "fieldname": "item",
    "fieldtype": "Link",
-   "in_list_view": 1,
    "label": "Item",
    "options": "Item"
   },
@@ -237,6 +237,7 @@
    "default": "0",
    "fieldname": "ready_to_process",
    "fieldtype": "Check",
+   "in_list_view": 1,
    "label": "Ready to Process"
   },
   {
@@ -292,7 +293,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-02-12 11:58:24.501102",
+ "modified": "2026-02-13 09:02:41.600784",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon STN Entry Item",
