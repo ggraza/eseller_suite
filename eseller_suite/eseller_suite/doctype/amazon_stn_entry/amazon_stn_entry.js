@@ -2,11 +2,31 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Amazon STN Entry", {
-	stn_file(frm) {
-		if (!frm.doc.stn_file) {
-			frm.clear_table("stn_entries");
-			frm.refresh_field("stn_entries");
-		}
-	}
+    refresh(frm) {
+        if (!frm.is_new()) {
+            set_error_messages_html(frm);
+        }
+    },
+    stn_file(frm) {
+        if (!frm.doc.stn_file) {
+            frm.clear_table("stn_entries");
+            frm.refresh_field("stn_entries");
+        }
+    }
 });
 
+function set_error_messages_html(frm) {
+    frm.call('get_error_message_html').then(r => {
+        if (r.message) {
+            frm.set_df_property('section_break_ijoc', 'hidden', 0);
+            var data = r.message;
+            $(frm.fields_dict['error_messages_html'].wrapper).html(data);
+            frm.refresh_fields();
+        }
+        else {
+            frm.set_df_property('section_break_ijoc', 'hidden', 0);
+            $(frm.fields_dict['error_messages_html'].wrapper).html('');
+            frm.refresh_fields();
+        }
+    });
+}
