@@ -14,6 +14,9 @@ class AmazonSTNEntry(Document):
 		if not self.stn_entries:
 			self.process_stn_file()
 
+	def on_submit(self):
+		self.create_stock_entries_for_material_transfer()
+
 	def process_stn_file(self):
 		"""Fetch and validate the attached STN CSV file."""
 		if not self.stn_file:
@@ -250,3 +253,50 @@ class AmazonSTNEntry(Document):
 			</div>
 		"""
 		return error_html
+
+	def create_stock_entries_for_material_transfer(self):
+		"""Create Stock Entries for rows where Source Company equals Target Company."""
+		stock_entry_type = frappe.db.get_value("Stock Entry Type", {"purpose": "Material Transfer"}, "name")
+		for row in self.stn_entries:
+			if row.ready_to_process and not row.stock_entry:
+				if not (row.source_company and row.target_company and row.source_company == row.target_company):
+					error_message = f"Source Company ({row.source_company}) and Target Company ({row.target_company}) must be the same for Material Transfer."
+					frappe.db.set_value(row.doctype, row.name, {"error_log": error_message,"stock_entry": None,"transactions_created": 0})
+					row.error_log = error_message
+					row.stock_entry = None
+					row.transactions_created = 0
+					continue
+
+				if not stock_entry_type:
+					frappe.db.set_value(row.doctype, row.name, {"error_log": "Stock Entry Type for Material Transfer not found."})
+					row.error_log = "Stock Entry Type for Material Transfer not found."
+					continue
+
+				is_stock_item = frappe.db.get_value("Item", row.item, "is_stock_item")
+				if not is_stock_item:
+					error_message = f"{row.item} is not a stock Item"
+					frappe.db.set_value(row.doctype, row.name, {"error_log": error_message,"stock_entry": None,"transactions_created": 0})
+					row.error_log = error_message
+					row.stock_entry = None
+					row.transactions_created = 0
+					continue
+
+				se = frappe.get_doc({
+					"doctype": "Stock Entry",
+					"stock_entry_type": stock_entry_type,
+					"company": row.source_company,
+					"posting_date": row.invoice_date,
+					"posting_time": row.invoice_time,
+					"set_posting_time": 1,
+					"items": [
+						{
+							"item_code": row.item,
+							"qty": flt(row.qty),
+							"s_warehouse": row.source_warehouse,
+							"t_warehouse": row.target_warehouse,
+							"basic_rate": flt(row.invoice_value) / flt(row.qty) if flt(row.qty) else 0,
+							"allow_zero_valuation_rate": 1
+						}
+					]
+				})
+				se.insert(ignore_permissions=True)
