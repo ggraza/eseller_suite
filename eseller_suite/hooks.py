@@ -29,8 +29,9 @@ app_license = "mit"
 
 # include js in doctype views
 doctype_js = {
-    "Sales Order" : "eseller_suite/custom_script/sales_order/sales_order.js",
-    "Item" : "eseller_suite/custom_script/item/item.js"
+	"Sales Order" : "eseller_suite/custom_script/sales_order/sales_order.js",
+	"Item" : "eseller_suite/custom_script/item/item.js",
+	"Stock Entry" : "eseller_suite/custom_script/stock_entry/stock_entry.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -132,7 +133,7 @@ doc_events = {
 		"validate": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.validate",
 		"before_submit": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.before_submit",
 		"on_cancel": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.on_cancel",
-    },
+	},
 	'Purchase Receipt':{
 		"before_validate": "eseller_suite.eseller_suite.custom_script.purchase_receipt.purchase_receipt.create_barcodes",
 		"before_submit": "eseller_suite.eseller_suite.custom_script.purchase_receipt.purchase_receipt.activate_barcodes",
@@ -143,7 +144,7 @@ doc_events = {
 		"before_submit": "eseller_suite.eseller_suite.custom_script.stock_entry.stock_entry.transfer_barcodes",
 		"before_insert": "eseller_suite.eseller_suite.custom_script.stock_entry.stock_entry.before_insert_custom",
 		"on_cancel": "eseller_suite.eseller_suite.custom_script.stock_entry.stock_entry.on_canel",
-    },
+	},
 }
 
 # Scheduled Tasks
