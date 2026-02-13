@@ -1,18 +1,34 @@
 # Copyright (c) 2026, efeone and contributors
 # For license information, please see license.txt
 
+from frappe.core.doctype.submission_queue.submission_queue import queue_submission
 import frappe
 from frappe.model.document import Document
-from frappe.utils import get_datetime
+from frappe.utils import get_datetime, flt
 
 import os
 import csv
 from charset_normalizer import from_path
 
 class AmazonSTNEntry(Document):
+	def submit(self):
+		if len(self.stn_entries) > 50:
+			queue_submission(self, "_submit")
+		else:
+			return self._submit()
+
 	def validate(self):
 		if not self.stn_entries:
 			self.process_stn_file()
+
+	def on_submit(self):
+		self.create_stock_entries_for_material_transfer()
+
+	def before_cancel(self):
+		self.cancel_linked_documents()
+
+	def on_trash(self):
+		self.delete_linked_documents()
 
 	def process_stn_file(self):
 		"""Fetch and validate the attached STN CSV file."""
@@ -250,3 +266,83 @@ class AmazonSTNEntry(Document):
 			</div>
 		"""
 		return error_html
+
+	def create_stock_entries_for_material_transfer(self):
+		"""Create Stock Entries for rows where Source Company equals Target Company."""
+		stock_entry_type = frappe.db.get_value("Stock Entry Type", {"purpose": "Material Transfer"}, "name")
+		if not stock_entry_type:
+			frappe.throw("Stock Entry Type for Material Transfer not found. Please configure it before submitting the STN Entry.")
+
+		for row in self.stn_entries:
+			if row.ready_to_process and not row.stock_entry:
+				if (row.source_company == row.target_company):
+					existing_stock_entry = frappe.db.get_value("Stock Entry", {"amazon_invoice_id": row.invoice_number}, "name")
+					if existing_stock_entry:
+						frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1})
+						continue
+
+					is_stock_item = frappe.db.get_value("Item", row.item, "is_stock_item")
+					if not is_stock_item:
+						error_message = f"{row.item} is not a stock Item"
+						frappe.db.set_value(row.doctype, row.name, {"error_log": error_message,"stock_entry": None,"transactions_created": 0})
+						continue
+
+					se = frappe.new_doc('Stock Entry')
+					se.stock_entry_type = stock_entry_type
+					se.company = row.source_company
+					se.posting_date = row.invoice_date
+					se.posting_time = row.invoice_time
+					se.set_posting_time = 1
+					se.amazon_invoice_id = row.invoice_number
+					se.from_warehouse = row.source_warehouse
+					se.to_warehouse = row.target_warehouse
+					se.append("items",{
+						"item_code": row.item,
+						"qty": flt(row.qty),
+						"s_warehouse": row.source_warehouse,
+						"t_warehouse": row.target_warehouse,
+						"basic_rate": flt(row.invoice_value) / flt(row.qty) if flt(row.qty) else 0,
+						"allow_zero_valuation_rate": 1
+					})
+					se.insert(ignore_permissions=True)
+					frappe.db.set_value(row.doctype, row.name, {
+						"stock_entry": se.name,
+						"transactions_created": 1,
+						"error_log": ""
+					})
+					frappe.db.savepoint("before_stn_stock_entry_submit")
+					try:
+						se.submit()
+					except Exception as e:
+						frappe.db.rollback(save_point="before_stn_stock_entry_submit")
+						error_message = f"Stock Entry {se.name} created but submission failed: {str(e)}"
+						frappe.db.set_value(row.doctype, row.name, "error_log", error_message)
+
+	def delete_linked_documents(self):
+		"""Delete linked Stock Entries when the STN Entry is deleted."""
+		# Delete linked submission queue entry
+		if frappe.db.exists('Submission Queue', {"ref_doctype": self.doctype, "ref_docname": self.name}):
+			frappe.db.delete('Submission Queue', {"ref_doctype": self.doctype, "ref_docname": self.name})
+
+		# Delete linked Entries
+		for row in self.stn_entries:
+			if row.stock_entry:
+				try:
+					se = frappe.get_doc("Stock Entry", row.stock_entry)
+					if se.docstatus == 1:
+						se.cancel()
+					frappe.delete_doc("Stock Entry", row.stock_entry, ignore_permissions=True, force=True)
+				except Exception as e:
+					frappe.log_error(message=f"Failed to delete Stock Entry {row.stock_entry} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Deletion Error")
+
+	def cancel_linked_documents(self):
+		"""Cancel linked Stock Entries when the STN Entry is Cancelled."""
+		# Cancel linked Entries
+		for row in self.stn_entries:
+			if row.stock_entry:
+				try:
+					se = frappe.get_doc("Stock Entry", row.stock_entry)
+					if se.docstatus == 1:
+						se.cancel()
+				except Exception as e:
+					frappe.log_error(message=f"Failed to Cancel Stock Entry {row.stock_entry} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Cancel Error")
