@@ -44,3 +44,12 @@ def before_insert_custom(doc, method=None):
             doc.to_warehouse = return_warehouse
             for row in doc.items:
                 row.t_warehouse = return_warehouse
+
+def on_canel(doc, method):
+    doc.ignore_linked_doctypes = (
+        "GL Entry",
+		"Stock Ledger Entry",
+		"Repost Item Valuation",
+		"Serial and Batch Bundle",
+		"Amazon STN Entry",
+	)
