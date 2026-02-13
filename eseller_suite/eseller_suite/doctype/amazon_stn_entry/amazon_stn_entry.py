@@ -22,6 +22,31 @@ class AmazonSTNEntry(Document):
 			self.process_stn_file()
 
 	def on_submit(self):
+		error_log = []
+
+		for stn in self.stn_entries:
+			try:
+				# Skip rows not ready
+				if not stn.ready_to_process:
+					continue
+
+				# SAME COMPANY → handled later in stock entry
+				if stn.source_company == stn.target_company:
+					continue
+
+				# CROSS-COMPANY → Sales + Purchase Invoice
+				self.create_sales_invoice(stn, error_log)
+				self.create_purchase_invoice(stn, error_log)
+
+				frappe.db.set_value(stn.doctype, stn.name, "transactions_created", 1)
+
+			except Exception as e:
+				self.add_error_log(stn, f"Unexpected error on submit: {str(e)}")
+
+		if error_log:
+			self.log_exception(error_log)
+
+		self.create_stock_entries_for_material_transfer()
 		self.create_stock_entries_for_material_transfer()
 
 	def before_cancel(self):
@@ -346,3 +371,111 @@ class AmazonSTNEntry(Document):
 						se.cancel()
 				except Exception as e:
 					frappe.log_error(message=f"Failed to Cancel Stock Entry {row.stock_entry} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Cancel Error")
+
+	def add_error_log(self, row, error_message):
+		"""Append error message to row's error_log safely."""
+		if row:
+			existing = frappe.db.get_value(row.doctype, row.name, "error_log") or ""
+			updated = f"{existing}\n{error_message}" if existing else error_message
+			frappe.db.set_value(row.doctype, row.name, "error_log", updated)
+		else:
+			frappe.log_error(message=f"Error log attempted but row is None: {error_message}", title="Amazon STN Entry Error")
+
+	def create_sales_invoice(self, row, error_log):
+		"""Create Sales Invoice for Source Company"""
+		try:
+			customer = frappe.db.get_value(
+				"Customer",
+				{"represents_company": row.target_company, "is_internal_customer": 1},
+				"name"
+			)
+
+			if not customer:
+				self.add_error_log(row, f"Internal Customer for Company {row.target_company} not found.")
+				return
+
+			tax_template = frappe.db.get_value(
+				"Item Tax Template Detail",
+				{"parent": row.item, "tax_rate": flt(row.igst_rate)},
+				"parent"
+			)
+
+			si = frappe.new_doc("Sales Invoice")
+			si.customer = customer
+			si.company = row.source_company
+			si.posting_date = row.invoice_date
+			si.posting_time = row.invoice_time
+			si.set_posting_time = 1
+
+			si.append("items", {
+				"item_code": row.item,
+				"qty": flt(row.qty),
+				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+				"warehouse": row.source_warehouse
+			})
+
+			if tax_template:
+				account_head = frappe.db.get_value("Item Tax Template", tax_template, "tax_account")
+				si.append("taxes", {
+					"charge_type": "On Net Total",
+					"account_head": account_head,
+					"rate": flt(row.igst_rate)
+				})
+
+			si.save(ignore_permissions=True)
+			si.submit()
+
+			frappe.db.set_value(row.doctype, row.name, "sales_invoice", si.name)
+
+		except Exception as e:
+			self.add_error_log(row, f"Failed to create Sales Invoice: {str(e)}")
+
+	def create_purchase_invoice(self, row, error_log):
+		"""Create Purchase Invoice for Target Company"""
+		try:
+			supplier = frappe.db.get_value(
+				"Supplier",
+				{"represents_company": row.source_company, "is_internal_supplier": 1},
+				"name"
+			)
+
+			if not supplier:
+				self.add_error_log(row, f"Internal Supplier for Company {row.source_company} not found.")
+				return
+
+			tax_template = frappe.db.get_value(
+				"Item Tax Template Detail",
+				{"parent": row.item, "tax_rate": flt(row.igst_rate)},
+				"parent"
+			)
+
+			pi = frappe.new_doc("Purchase Invoice")
+			pi.supplier = supplier
+			pi.company = row.target_company
+			pi.posting_date = row.invoice_date
+			pi.posting_time = row.invoice_time
+			pi.set_posting_time = 1
+			pi.bill_no = row.invoice_number
+
+			pi.append("items", {
+				"item_code": row.item,
+				"qty": flt(row.qty),
+				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+				"warehouse": row.target_warehouse
+			})
+
+			if tax_template:
+				account_head = frappe.db.get_value("Item Tax Template", tax_template, "tax_account")
+				pi.append("taxes", {
+					"charge_type": "On Net Total",
+					"account_head": account_head,
+					"rate": flt(row.igst_rate)
+				})
+
+			pi.save(ignore_permissions=True)
+			pi.submit()
+
+			frappe.db.set_value(row.doctype, row.name, "purchase_invoice", pi.name)
+
+		except Exception as e:
+			self.add_error_log(row, f"Failed to create Purchase Invoice: {str(e)}")
