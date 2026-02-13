@@ -528,6 +528,14 @@ def get_stock_entry_custom_fields():
 				"insert_after": "sales_invoice_no",
 				"read_only": 1
 			},
+			{
+				"fieldname": "amazon_invoice_id",
+				"fieldtype": "Data",
+				"label": "Amazon Invoice ID",
+				"read_only": 1,
+				"insert_after": "ewaybill",
+				"no_copy": 1
+			},
 		]
 	}
 
