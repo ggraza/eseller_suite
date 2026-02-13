@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_copy": 1,
  "allow_rename": 1,
  "autoname": "AMZN-STN-.#####",
  "creation": "2026-02-11 14:37:01.568331",
@@ -45,6 +46,7 @@
    "fieldname": "stn_entries",
    "fieldtype": "Table",
    "label": "STN Entries",
+   "no_copy": 1,
    "options": "Amazon STN Entry Item",
    "read_only": 1
   },
@@ -56,6 +58,7 @@
    "fieldname": "stn_file",
    "fieldtype": "Attach",
    "label": "STN File",
+   "no_copy": 1,
    "reqd": 1
   }
  ],
@@ -63,7 +66,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-12 11:45:09.686773",
+ "modified": "2026-02-13 11:42:54.175374",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon STN Entry",
