@@ -3,11 +3,11 @@
 
 import frappe
 from frappe.model.document import Document
-from frappe.utils import flt, get_datetime
-import csv
+from frappe.utils import get_datetime
+
 import os
+import csv
 from charset_normalizer import from_path
-from datetime import datetime
 
 class AmazonSTNEntry(Document):
 	def validate(self):
@@ -43,7 +43,8 @@ class AmazonSTNEntry(Document):
 					self.save_stn_entry_row(row)
 
 		except Exception as e:
-			frappe.throw(f"Error processing STN CSV file: {e}")
+			error_message = f"Error processing STN CSV file: {str(e)}"
+			frappe.throw(error_message)
 
 	def save_stn_entry_row(self, row):
 		"""Map CSV row and append to STN Entries."""
@@ -94,65 +95,57 @@ class AmazonSTNEntry(Document):
 
 		child = self.append("stn_entries", stn_row)
 		self.map_companies_and_warehouses(child)
-		self.map_item(child)
+		self.map_and_update_item(child)
 		self.set_ready_to_process(child)
 
 	def map_companies_and_warehouses(self, row):
 		"""Map companies and warehouses for the STN row."""
-		allow_create = frappe.get_single_value("eSeller Settings", "allow_missing_warehouse_creation")
-
 		# Set source company and warehouse
 		row.source_company = self.get_company_from_gstin(row.source_gstin)
 		if row.source_company:
-			source_wh = self.get_warehouse_by_code(
-				code=row.source_fc,
-				city=row.source_fc_city,
-				state=row.source_fc_state,
-				pin=row.source_fc_pin,
-				company=row.source_company,
-				allow_create=allow_create
-			)
+			source_wh = self.get_warehouse_by_code(code=row.source_fc, row=row)
 			if source_wh:
-				row.source_warehouse = source_wh.name
-
+				row.source_warehouse = source_wh
+			else:
+				self.add_error_log(row,f"Source Warehouse not found for code: {row.source_fc} and company: {row.source_company}")
 		else:
-			self.add_error_log(row,f"Source Company not found for GSTIN: {row.source_gstin}")
+			self.add_error_log(row, f"Source Company not found for GSTIN: {row.source_gstin}")
 
 		# Set target company and warehouse
 		row.target_company = self.get_company_from_gstin(row.target_gstin)
 		if row.target_company:
-			target_wh = self.get_warehouse_by_code(
-				code=row.target_fc,
-				city=row.target_fc_city,
-				state=row.target_fc_state,
-				pin=row.target_fc_pin,
-				company=row.target_company,
-				allow_create=allow_create
-			)
+			target_wh = self.get_warehouse_by_code(code=row.target_fc, row=row)
 			if target_wh:
-				row.target_warehouse = target_wh.name
+				row.target_warehouse = target_wh
+			else:
+				self.add_error_log(row,f"Target Warehouse not found for code: {row.target_fc} and company: {row.target_company}")
 		else:
 			self.add_error_log(row,f"Target Company not found for GSTIN: {row.target_gstin}")
 
-	def get_warehouse_by_code(self, code, company, city=None, state=None, pin=None, allow_create=False):
+	def get_warehouse_by_code(self, code, row):
 		"""Get or create warehouse by Amazon code for given company."""
-		wh = frappe.db.get_value("Warehouse",{"amazon_warehouse_code": code, "company": company},["name", "company"],as_dict=True)
+		allow_create = frappe.get_single_value("eSeller Settings", "allow_missing_warehouse_creation")
+		wh = frappe.db.get_value("Warehouse", {"amazon_warehouse_code": code}, "name")
 
 		if wh:
 			return wh
 		if allow_create:
-			return self.create_missing_warehouse(code=code,city=city,state=state,pin=pin,company=company)
+			city = row.source_fc_city if code == row.source_fc else row.target_fc_city
+			state = row.source_fc_state if code == row.source_fc else row.target_fc_state
+			pin = row.source_fc_pin if code == row.source_fc else row.target_fc_pin
+			company = row.source_company if code == row.source_fc else row.target_company
+			return self.create_missing_warehouse(row=row, code=code, city=city, state=state, pin=pin, company=company)
 		return None
 
-	def create_missing_warehouse(self, code, city, state, pin, company):
+	def create_missing_warehouse(self, row, code, city, state, pin, company):
 		"""Create and return a missing Warehouse for the given company."""
 		existing_wh = frappe.db.exists("Warehouse", {"amazon_warehouse_code": code})
 		if existing_wh:
-			return frappe.db.get_value("Warehouse",existing_wh,["name", "company"],as_dict=True)
+			return existing_wh
 
 		parent_wh = self.get_parent_warehouse_for_company(company)
 		if not parent_wh:
-			self.add_error_log(None, f"No Parent Warehouse for Company {company}")
+			self.add_error_log(row, f"No Parent Warehouse for Company {company}")
 			return None
 
 		try:
@@ -168,13 +161,11 @@ class AmazonSTNEntry(Document):
 				"is_group": 0
 			}).insert(ignore_permissions=True)
 
-			return frappe._dict({
-				"name": wh.name,
-				"company": company
-			})
+			return wh.name
 
 		except Exception as e:
-			self.add_error_log(None,f"Error creating warehouse for code {code} and company {company}: {str(e)}")
+			exception_message = f"Error creating warehouse for code {code} and company {company}: {str(e)}"
+			self.add_error_log(row, exception_message)
 			return None
 
 	def get_parent_warehouse_for_company(self, company):
@@ -189,21 +180,29 @@ class AmazonSTNEntry(Document):
 		"""Return Item mapped to the given ASIN."""
 		return frappe.db.get_value("Item", {"amazon_item_code": asin}, "name")
 
-	def map_item(self, row):
-		"""Map Item to row using ASIN or HSN code."""
+	def map_and_update_item(self, row):
+		"""Map Item to row using ASIN and update HSN code if missing."""
 		if row.asin:
 			item = self.get_item_with_asin(row.asin)
 			if item:
 				row.item = item
+
+				#Update HSN code in Item master if missing
+				item_hsn = frappe.db.get_value("Item", item, "gst_hsn_code")
+				if not item_hsn and row.hsn_code:
+					frappe.db.set_value("Item", item, "gst_hsn_code", row.hsn_code)
 			else:
-				self.add_error_log(row,f"Item not found for ASIN: {row.asin}")
+				self.add_error_log(row, f"Item not found for ASIN: {row.asin}")
 
 	def add_error_log(self, row, error_message):
 		"""Append error message to row's error_log field."""
-		if row.error_log:
-			row.error_log += f"\n{error_message}"
+		if row:
+			if row.error_log:
+				row.error_log += f"\n{error_message}"
+			else:
+				row.error_log = error_message
 		else:
-			row.error_log = error_message
+			frappe.log_error(message=f"Error log entry attempted but row is None: {error_message}", title="Amazon STN Entry Error")
 
 	def set_ready_to_process(self, row):
 		"""Set ready flag if all required mappings are available."""
