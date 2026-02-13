@@ -65,10 +65,20 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Tools",
-   "link_count": 3,
+   "link_count": 4,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Amazon STN Entry",
+   "link_count": 0,
+   "link_to": "Amazon STN Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   },
   {
    "hidden": 0,
@@ -101,7 +111,7 @@
    "type": "Link"
   }
  ],
- "modified": "2025-12-23 13:32:53.486045",
+ "modified": "2026-02-12 15:32:56.272986",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "eSeller Suite",
@@ -115,7 +125,10 @@
    "role": "Sales User"
   },
   {
-   "role": "Non Designated Partner"
+   "role": "Sales Manager"
+  },
+  {
+   "role": "System Manager"
   }
  ],
  "sequence_id": 2.0,
