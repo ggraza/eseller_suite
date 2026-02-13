@@ -13,7 +13,9 @@
   "posting_date",
   "amended_from",
   "section_break_rozl",
-  "stn_entries"
+  "stn_entries",
+  "section_break_ijoc",
+  "error_messages_html"
  ],
  "fields": [
   {
@@ -60,13 +62,24 @@
    "label": "STN File",
    "no_copy": 1,
    "reqd": 1
+  },
+  {
+   "fieldname": "section_break_ijoc",
+   "fieldtype": "Section Break",
+   "hidden": 1,
+   "label": "Exceptions"
+  },
+  {
+   "fieldname": "error_messages_html",
+   "fieldtype": "HTML",
+   "label": "Error Messages HTML"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-13 11:42:54.175374",
+ "modified": "2026-02-13 14:26:01.580801",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon STN Entry",
