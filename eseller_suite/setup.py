@@ -270,6 +270,14 @@ def get_sales_invoice_custom_fields():
 				"insert_after": "base_in_words",
 				"read_only": 1,
 				"no_copy": 1,
+			},
+			{
+				"fieldname": "amazon_invoice_id",
+				"fieldtype": "Data",
+				"label": "Amazon Invoice ID",
+				"insert_after": "company",
+				"read_only": 1,
+				"no_copy": 1,
 			}
 		],
 		"Sales Invoice Item": [
@@ -388,6 +396,14 @@ def get_purchase_invoice_custom_fields():
 				"insert_after": "wallet_topup",
 				"read_only": 1,
 				"no_copy": 1
+			},
+			{
+				"fieldname": "amazon_invoice_id",
+				"fieldtype": "Data",
+				"label": "Amazon Invoice ID",
+				"insert_after": "company",
+				"read_only": 1,
+				"no_copy": 1,
 			}
 		],
 		"Purchase Invoice Item": [
