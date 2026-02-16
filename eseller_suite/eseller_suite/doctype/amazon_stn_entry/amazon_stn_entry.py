@@ -204,9 +204,13 @@ class AmazonSTNEntry(Document):
 				row.item = item
 
 				#Update HSN code in Item master if missing
-				item_hsn = frappe.db.get_value("Item", item, "gst_hsn_code")
+				item_hsn, allow_purchase = frappe.db.get_value("Item", item, ["gst_hsn_code", "is_purchase_item"])
 				if not item_hsn and row.hsn_code:
 					frappe.db.set_value("Item", item, "gst_hsn_code", row.hsn_code)
+
+				# If item is not marked as purchase item and it's an inter-company transfer, mark it as purchase item
+				if row.source_company != row.target_company and not allow_purchase:
+					frappe.db.set_value('Item', item, 'is_purchase_item', 1)
 			else:
 				self.add_error_log(row, f"Item not found for ASIN: {row.asin}")
 
@@ -472,7 +476,7 @@ class AmazonSTNEntry(Document):
 
 		existing_invoice = frappe.db.exists("Purchase Invoice", {
 			"amazon_invoice_id": row.invoice_number,
-			"company": row.source_company,
+			"company": row.target_company,
 			"docstatus": ["!=", 2]  # Exclude cancelled invoices
 		})
 		if existing_invoice:
