@@ -32,6 +32,7 @@ doctype_js = {
 	"Sales Order" : "eseller_suite/custom_script/sales_order/sales_order.js",
 	"Item" : "eseller_suite/custom_script/item/item.js",
 	"Stock Entry" : "eseller_suite/custom_script/stock_entry/stock_entry.js",
+	"Purchase Invoice" : "eseller_suite/custom_script/purchase_invoice/purchase_invoice.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -148,6 +149,9 @@ doc_events = {
 	'Purchase Invoice':{
 		"on_cancel": "eseller_suite.eseller_suite.custom_script.purchase_invoice.purchase_invoice.on_cancel",
 	},
+	'Product Bundle':{
+        "after_insert": "eseller_suite.eseller_suite.custom_script.product_bundle.product_bundle.mark_item_as_bundle",
+    },
 }
 
 # Scheduled Tasks
