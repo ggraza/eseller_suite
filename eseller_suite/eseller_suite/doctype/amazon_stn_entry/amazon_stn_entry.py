@@ -22,32 +22,7 @@ class AmazonSTNEntry(Document):
 			self.process_stn_file()
 
 	def on_submit(self):
-		error_log = []
-
-		for stn in self.stn_entries:
-			try:
-				# Skip rows not ready
-				if not stn.ready_to_process:
-					continue
-
-				# SAME COMPANY → handled later in stock entry
-				if stn.source_company == stn.target_company:
-					continue
-
-				# CROSS-COMPANY → Sales + Purchase Invoice
-				self.create_sales_invoice(stn, error_log)
-				self.create_purchase_invoice(stn, error_log)
-
-				frappe.db.set_value(stn.doctype, stn.name, "transactions_created", 1)
-
-			except Exception as e:
-				self.add_error_log(stn, f"Unexpected error on submit: {str(e)}")
-
-		if error_log:
-			self.log_exception(error_log)
-
-		self.create_stock_entries_for_material_transfer()
-		self.create_stock_entries_for_material_transfer()
+		self.handle_stock_movement_entries()
 
 	def before_cancel(self):
 		self.cancel_linked_documents()
@@ -292,56 +267,56 @@ class AmazonSTNEntry(Document):
 		"""
 		return error_html
 
-	def create_stock_entries_for_material_transfer(self):
-		"""Create Stock Entries for rows where Source Company equals Target Company."""
-		stock_entry_type = frappe.db.get_value("Stock Entry Type", {"purpose": "Material Transfer"}, "name")
-		if not stock_entry_type:
-			frappe.throw("Stock Entry Type for Material Transfer not found. Please configure it before submitting the STN Entry.")
+	def create_stock_entries_for_material_transfer(self, row, stock_entry_type):
+		"""
+			Create Stock Entries for rows where Source Company equals Target Company.
+		"""
+		if row.source_company != row.target_company:
+			return
+		existing_stock_entry = frappe.db.get_value("Stock Entry", {"amazon_invoice_id": row.invoice_number}, "name")
+		if existing_stock_entry:
+			frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1})
+			return
 
-		for row in self.stn_entries:
-			if row.ready_to_process and not row.stock_entry:
-				if (row.source_company == row.target_company):
-					existing_stock_entry = frappe.db.get_value("Stock Entry", {"amazon_invoice_id": row.invoice_number}, "name")
-					if existing_stock_entry:
-						frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1})
-						continue
+		is_stock_item = frappe.db.get_value("Item", row.item, "is_stock_item")
+		if not is_stock_item:
+			error_message = f"{row.item} is not a stock Item"
+			frappe.db.set_value(row.doctype, row.name, {"error_log": error_message,"stock_entry": None,"transactions_created": 0})
+			return
 
-					is_stock_item = frappe.db.get_value("Item", row.item, "is_stock_item")
-					if not is_stock_item:
-						error_message = f"{row.item} is not a stock Item"
-						frappe.db.set_value(row.doctype, row.name, {"error_log": error_message,"stock_entry": None,"transactions_created": 0})
-						continue
+		# Create Stock Entry
+		se = frappe.new_doc('Stock Entry')
+		se.stock_entry_type = stock_entry_type
+		se.company = row.source_company
+		se.posting_date = row.invoice_date
+		se.posting_time = row.invoice_time
+		se.set_posting_time = 1
+		se.amazon_invoice_id = row.invoice_number
+		se.from_warehouse = row.source_warehouse
+		se.to_warehouse = row.target_warehouse
+		se.append("items",{
+			"item_code": row.item,
+			"qty": flt(row.qty),
+			"s_warehouse": row.source_warehouse,
+			"t_warehouse": row.target_warehouse,
+			"basic_rate": flt(row.invoice_value) / flt(row.qty) if flt(row.qty) else 0,
+			"allow_zero_valuation_rate": 1
+		})
+		se.insert(ignore_permissions=True)
+		frappe.db.set_value(row.doctype, row.name, {
+			"stock_entry": se.name,
+			"transactions_created": 1,
+			"error_log": ""
+		})
 
-					se = frappe.new_doc('Stock Entry')
-					se.stock_entry_type = stock_entry_type
-					se.company = row.source_company
-					se.posting_date = row.invoice_date
-					se.posting_time = row.invoice_time
-					se.set_posting_time = 1
-					se.amazon_invoice_id = row.invoice_number
-					se.from_warehouse = row.source_warehouse
-					se.to_warehouse = row.target_warehouse
-					se.append("items",{
-						"item_code": row.item,
-						"qty": flt(row.qty),
-						"s_warehouse": row.source_warehouse,
-						"t_warehouse": row.target_warehouse,
-						"basic_rate": flt(row.invoice_value) / flt(row.qty) if flt(row.qty) else 0,
-						"allow_zero_valuation_rate": 1
-					})
-					se.insert(ignore_permissions=True)
-					frappe.db.set_value(row.doctype, row.name, {
-						"stock_entry": se.name,
-						"transactions_created": 1,
-						"error_log": ""
-					})
-					frappe.db.savepoint("before_stn_stock_entry_submit")
-					try:
-						se.submit()
-					except Exception as e:
-						frappe.db.rollback(save_point="before_stn_stock_entry_submit")
-						error_message = f"Stock Entry {se.name} created but submission failed: {str(e)}"
-						frappe.db.set_value(row.doctype, row.name, "error_log", error_message)
+		# Submit Stock Entry with error handling
+		frappe.db.savepoint("before_stn_stock_entry_submit")
+		try:
+			se.submit()
+		except Exception as e:
+			frappe.db.rollback(save_point="before_stn_stock_entry_submit")
+			error_message = f"Stock Entry {se.name} created but submission failed: {str(e)}"
+			frappe.db.set_value(row.doctype, row.name, "error_log", error_message)
 
 	def delete_linked_documents(self):
 		"""Delete linked Stock Entries when the STN Entry is deleted."""
@@ -353,17 +328,27 @@ class AmazonSTNEntry(Document):
 		for row in self.stn_entries:
 			if row.stock_entry:
 				try:
-					se = frappe.get_doc("Stock Entry", row.stock_entry)
-					if se.docstatus == 1:
-						se.cancel()
 					frappe.delete_doc("Stock Entry", row.stock_entry, ignore_permissions=True, force=True)
 				except Exception as e:
 					frappe.log_error(message=f"Failed to delete Stock Entry {row.stock_entry} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Deletion Error")
+
+			if row.sales_invoice:
+				try:
+					frappe.delete_doc("Sales Invoice", row.sales_invoice, ignore_permissions=True, force=True)
+				except Exception as e:
+					frappe.log_error(message=f"Failed to delete Sales Invoice {row.sales_invoice} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Deletion Error")
+
+			if row.purchase_invoice:
+				try:
+					frappe.delete_doc("Purchase Invoice", row.purchase_invoice, ignore_permissions=True, force=True)
+				except Exception as e:
+					frappe.log_error(message=f"Failed to delete Purchase Invoice {row.purchase_invoice} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Deletion Error")
 
 	def cancel_linked_documents(self):
 		"""Cancel linked Stock Entries when the STN Entry is Cancelled."""
 		# Cancel linked Entries
 		for row in self.stn_entries:
+			# Cancel linked Stock Entry
 			if row.stock_entry:
 				try:
 					se = frappe.get_doc("Stock Entry", row.stock_entry)
@@ -371,6 +356,24 @@ class AmazonSTNEntry(Document):
 						se.cancel()
 				except Exception as e:
 					frappe.log_error(message=f"Failed to Cancel Stock Entry {row.stock_entry} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Cancel Error")
+
+			# Cancel linked Sales Invoice
+			if row.sales_invoice:
+				try:
+					si = frappe.get_doc("Sales Invoice", row.sales_invoice)
+					if si.docstatus == 1:
+						si.cancel()
+				except Exception as e:
+					frappe.log_error(message=f"Failed to Cancel Sales Invoice {row.sales_invoice} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Cancel Error")
+
+			# Cancel linked Purchase Invoice
+			if row.purchase_invoice:
+				try:
+					pi = frappe.get_doc("Purchase Invoice", row.purchase_invoice)
+					if pi.docstatus == 1:
+						pi.cancel()
+				except Exception as e:
+					frappe.log_error(message=f"Failed to Cancel Purchase Invoice {row.sales_invoice} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Cancel Error")
 
 	def add_error_log(self, row, error_message):
 		"""Append error message to row's error_log safely."""
@@ -381,31 +384,47 @@ class AmazonSTNEntry(Document):
 		else:
 			frappe.log_error(message=f"Error log attempted but row is None: {error_message}", title="Amazon STN Entry Error")
 
-	def create_sales_invoice(self, row, error_log):
-		"""Create Sales Invoice for Source Company"""
+	def create_sales_invoice(self, row):
+		"""
+			Create Sales Invoice for Source Company
+		"""
+		if row.source_company == row.target_company:
+			return
+
+		existing_invoice = frappe.db.exists("Sales Invoice", {
+			"amazon_invoice_id": row.invoice_number,
+			"company": row.source_company,
+			"docstatus": ["!=", 2]  # Exclude cancelled invoices
+		})
+		if existing_invoice:
+			frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice)
+			return
+
+		customer = frappe.db.get_value("Customer", {"represents_company": row.target_company, "is_internal_customer": 1})
+		if not customer:
+			self.add_error_log(row, f"Internal Customer for Company {row.target_company} not found.")
+			return
+
+		tax_rate = flt(row.igst_rate)*100
+		igst_account = frappe.db.get_value("GST Account", {
+			"company": row.source_company,
+			"account_type": "Output",
+			"parent": "GST Settings",
+			"parentfield": "gst_accounts"
+		}, "igst_account")
+
 		try:
-			customer = frappe.db.get_value(
-				"Customer",
-				{"represents_company": row.target_company, "is_internal_customer": 1},
-				"name"
-			)
-
-			if not customer:
-				self.add_error_log(row, f"Internal Customer for Company {row.target_company} not found.")
-				return
-
-			tax_template = frappe.db.get_value(
-				"Item Tax Template Detail",
-				{"parent": row.item, "tax_rate": flt(row.igst_rate)},
-				"parent"
-			)
-
+			#Create Sales Invoice
 			si = frappe.new_doc("Sales Invoice")
 			si.customer = customer
 			si.company = row.source_company
 			si.posting_date = row.invoice_date
 			si.posting_time = row.invoice_time
 			si.set_posting_time = 1
+			si.update_stock = 1
+			si.amazon_invoice_id = row.invoice_number
+			si.set_warehouse = row.source_warehouse
+			si.disable_rounded_total = 1
 
 			si.append("items", {
 				"item_code": row.item,
@@ -414,41 +433,67 @@ class AmazonSTNEntry(Document):
 				"warehouse": row.source_warehouse
 			})
 
-			if tax_template:
-				account_head = frappe.db.get_value("Item Tax Template", tax_template, "tax_account")
+			if igst_account:
 				si.append("taxes", {
 					"charge_type": "On Net Total",
-					"account_head": account_head,
-					"rate": flt(row.igst_rate)
+					"account_head": igst_account,
+					"rate": tax_rate,
+					"description": f"IGST @ {tax_rate}%"
 				})
 
 			si.save(ignore_permissions=True)
-			si.submit()
-
 			frappe.db.set_value(row.doctype, row.name, "sales_invoice", si.name)
+
+			# Apply discount if invoice value is provided and does not match outstanding amount
+			invoice_value = flt(row.invoice_value)
+			if invoice_value and si.outstanding_amount != invoice_value:
+				si.discount_amount = si.outstanding_amount - invoice_value
+				si.save(ignore_permissions=True)
+				si.reload()  # Reload to get updated outstanding_amount after discount
+
+			# Submit Sales Invoice with error handling
+			frappe.db.savepoint("before_stn_sales_invoice_submit")
+			try:
+				si.submit()
+			except Exception as e:
+				frappe.db.rollback(save_point="before_stn_sales_invoice_submit")
+				error_message = f"Sales Invoice {si.name} created but submission failed: {str(e)}"
+				frappe.db.set_value(row.doctype, row.name, "error_log", error_message)
 
 		except Exception as e:
 			self.add_error_log(row, f"Failed to create Sales Invoice: {str(e)}")
 
-	def create_purchase_invoice(self, row, error_log):
-		"""Create Purchase Invoice for Target Company"""
+	def create_purchase_invoice(self, row):
+		"""
+			Create Purchase Invoice for Target Company
+		"""
+		if row.source_company == row.target_company:
+			return
+
+		existing_invoice = frappe.db.exists("Purchase Invoice", {
+			"amazon_invoice_id": row.invoice_number,
+			"company": row.source_company,
+			"docstatus": ["!=", 2]  # Exclude cancelled invoices
+		})
+		if existing_invoice:
+			frappe.db.set_value(row.doctype, row.name, "purchase_invoice", existing_invoice)
+			return
+
+		supplier = frappe.db.get_value("Supplier", {"represents_company": row.source_company, "is_internal_supplier": 1})
+
+		if not supplier:
+			self.add_error_log(row, f"Internal Supplier for Company {row.source_company} not found.")
+			return
+
+		tax_rate = flt(row.igst_rate)*100
+		igst_account = frappe.db.get_value("GST Account", {
+			"company": row.target_company,
+			"account_type": "Input",
+			"parent": "GST Settings",
+			"parentfield": "gst_accounts"
+		}, "igst_account")
+
 		try:
-			supplier = frappe.db.get_value(
-				"Supplier",
-				{"represents_company": row.source_company, "is_internal_supplier": 1},
-				"name"
-			)
-
-			if not supplier:
-				self.add_error_log(row, f"Internal Supplier for Company {row.source_company} not found.")
-				return
-
-			tax_template = frappe.db.get_value(
-				"Item Tax Template Detail",
-				{"parent": row.item, "tax_rate": flt(row.igst_rate)},
-				"parent"
-			)
-
 			pi = frappe.new_doc("Purchase Invoice")
 			pi.supplier = supplier
 			pi.company = row.target_company
@@ -456,6 +501,10 @@ class AmazonSTNEntry(Document):
 			pi.posting_time = row.invoice_time
 			pi.set_posting_time = 1
 			pi.bill_no = row.invoice_number
+			pi.update_stock = 1
+			pi.amazon_invoice_id = row.invoice_number
+			pi.set_warehouse = row.source_warehouse
+			pi.disable_rounded_total = 1
 
 			pi.append("items", {
 				"item_code": row.item,
@@ -464,18 +513,56 @@ class AmazonSTNEntry(Document):
 				"warehouse": row.target_warehouse
 			})
 
-			if tax_template:
-				account_head = frappe.db.get_value("Item Tax Template", tax_template, "tax_account")
+			if igst_account:
 				pi.append("taxes", {
 					"charge_type": "On Net Total",
-					"account_head": account_head,
-					"rate": flt(row.igst_rate)
+					"account_head": igst_account,
+					"rate": tax_rate,
+					"description": f"IGST @ {tax_rate}%"
 				})
 
 			pi.save(ignore_permissions=True)
-			pi.submit()
-
 			frappe.db.set_value(row.doctype, row.name, "purchase_invoice", pi.name)
+
+			# Apply discount if invoice value is provided and does not match outstanding amount
+			invoice_value = flt(row.invoice_value)
+			if invoice_value and pi.rounded_total != invoice_value:
+				pi.discount_amount = pi.rounded_total - invoice_value
+				pi.save(ignore_permissions=True)
+				pi.reload()  # Reload to get updated outstanding_amount after discount
+
+			# Submit Purchase Invoice with error handling
+			frappe.db.savepoint("before_stn_purchase_invoice_submit")
+			try:
+				pi.submit()
+			except Exception as e:
+				frappe.db.rollback(save_point="before_stn_purchase_invoice_submit")
+				error_message = f"Purchase Invoice {pi.name} created but submission failed: {str(e)}"
+				frappe.db.set_value(row.doctype, row.name, "error_log", error_message)
 
 		except Exception as e:
 			self.add_error_log(row, f"Failed to create Purchase Invoice: {str(e)}")
+
+	def handle_stock_movement_entries(self):
+		'''
+			Handle stock movement entries for rows like
+			Creating Sales/Purchase Invoices for Inter-Company Transfers.
+			Creating Stock Entries for Same Company Transfers.
+		'''
+		stock_entry_type = frappe.db.get_value("Stock Entry Type", {"purpose": "Material Transfer"}, "name")
+		if not stock_entry_type:
+			frappe.throw("Stock Entry Type for Material Transfer not found. Please configure it before submitting the STN Entry.")
+
+		for stn_row in self.stn_entries:
+			# Skip rows if not ready
+			if not stn_row.ready_to_process or stn_row.transactions_created:
+				continue
+
+			# Stock Entry for Same Company
+			if stn_row.source_company == stn_row.target_company:
+				self.create_stock_entries_for_material_transfer(stn_row, stock_entry_type)
+			else:
+				# For Inter-Company Transfers, create Sales and Purchase Invoices
+				self.create_sales_invoice(stn_row)
+				self.create_purchase_invoice(stn_row)
+				frappe.db.set_value(stn_row.doctype, stn_row.name, "transactions_created", 1)

@@ -24,7 +24,7 @@ function set_error_messages_html(frm) {
             frm.refresh_fields();
         }
         else {
-            frm.set_df_property('section_break_ijoc', 'hidden', 0);
+            frm.set_df_property('section_break_ijoc', 'hidden', 1);
             $(frm.fields_dict['error_messages_html'].wrapper).html('');
             frm.refresh_fields();
         }

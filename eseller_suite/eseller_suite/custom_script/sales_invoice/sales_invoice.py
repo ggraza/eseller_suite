@@ -13,6 +13,20 @@ def on_cancel(doc, method):
 	'''
 		Method which get trgiggered in on_cancel event
 	'''
+	doc.ignore_linked_doctypes = (
+		"GL Entry",
+		"Stock Ledger Entry",
+		"Repost Item Valuation",
+		"Repost Payment Ledger",
+		"Repost Payment Ledger Items",
+		"Repost Accounting Ledger",
+		"Repost Accounting Ledger Items",
+		"Unreconcile Payment",
+		"Unreconcile Payment Entries",
+		"Payment Ledger Entry",
+		"Serial and Batch Bundle",
+		"Amazon STN Entry",
+	)
 	if doc.is_return:
 		for item in doc.items:
 			if item.sales_invoice_item and frappe.db.exists('Sales Invoice Item', item.sales_invoice_item):
