@@ -202,3 +202,16 @@ def _unwrap_and_decode(data: bytes, filename: str | None = None):
 			continue
 
 	return data.decode("utf-8", errors="replace"), filename
+
+def get_report_status_scheduler():
+	'''
+		Scheduled function to check status of all pending reports
+	'''
+	pending_reports = frappe.get_all("Amazon Report API Log",
+		filters={"report_processing_status": ['!=', 'DONE'], "file_processed": 0},
+		pluck="name"
+	)
+	for report_log_id in pending_reports:
+		response = get_report_status(report_log_id)
+		if response:
+			get_report_url(report_log_id)

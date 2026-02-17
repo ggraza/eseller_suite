@@ -1,0 +1,16 @@
+[
+ {
+  "amazon_report_type": "GET_GST_STR_ADHOC",
+  "docstatus": 0,
+  "doctype": "Amazon Report Type",
+  "modified": "2026-02-17 13:59:20.038941",
+  "name": "GET_GST_STR_ADHOC"
+ },
+ {
+  "amazon_report_type": "GET_AMAZON_FULFILLED_SHIPMENTS_DATA_GENERAL",
+  "docstatus": 0,
+  "doctype": "Amazon Report Type",
+  "modified": "2026-02-17 13:59:36.095798",
+  "name": "GET_AMAZON_FULFILLED_SHIPMENTS_DATA_GENERAL"
+ }
+]

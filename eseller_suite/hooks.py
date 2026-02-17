@@ -158,9 +158,12 @@ doc_events = {
 # ---------------
 
 scheduler_events = {
-# 	"all": [
-# 		"eseller_suite.tasks.all"
-# 	],
+	"all": [
+		"eseller_suite.eseller_suite.doctype.amazon_report_api_log.amazon_report_api_log.get_report_status_scheduler"
+	],
+	"daily": [
+		"eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.create_daily_reports_schedule",
+	],
 	"daily_long": [
 		"eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.schedule_get_order_details_daily"
 	],
@@ -253,4 +256,11 @@ override_whitelisted_methods = {
 
 # Fixtures
 
-fixtures = [{"dt":"Amazon State Mapping"}]
+fixtures = [
+	{
+		"dt": "Amazon State Mapping"
+	},
+	{
+		"dt": "Amazon Report Type"
+	}
+]

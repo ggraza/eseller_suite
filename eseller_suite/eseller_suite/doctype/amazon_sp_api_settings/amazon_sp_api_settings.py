@@ -592,6 +592,9 @@ def enq_si_submit(sales_orders = []):
 			continue
 
 def create_report_api_log(report_id, report_type, from_date, to_date):
+	'''
+		Create a log entry for the created report in Amazon Report API Log doctype.
+	'''
 	try:
 		frappe.get_doc({
 			"doctype": "Amazon Report API Log",
@@ -604,4 +607,29 @@ def create_report_api_log(report_id, report_type, from_date, to_date):
 		frappe.log_error(
 			title="Failed to create Amazon Report API Log",
 			message=f"Report ID: {report_id}\nError: {str(e)}\nTraceback: {frappe.get_traceback()}"
+		)
+
+def create_daily_reports_schedule():
+	'''
+		Scheduler to create reports for the previous day.
+	'''
+	from_date = add_days(getdate(), -1)
+	to_date = getdate()
+	amz_settings = frappe.get_all(
+		"Amazon SP API Settings",
+		filters={"is_active": 1},
+		pluck="name",
+		limit=1,
+	)
+	report_types = frappe.db.get_all("Amazon Report Type", pluck="name")
+	if not amz_settings:
+		frappe.log_error(title="Amazon SP API Settings Not Found", message="No active Amazon SP API Settings found. Report creation skipped.")
+		return
+
+	self = frappe.get_doc("Amazon SP API Settings", amz_settings[0])
+	for report_type in report_types:
+		self.create_report(
+			report_type=report_type,
+			from_date=from_date,
+			to_date=to_date
 		)

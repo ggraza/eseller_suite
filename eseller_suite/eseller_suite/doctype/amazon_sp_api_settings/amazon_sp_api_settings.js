@@ -187,11 +187,24 @@ function handle_report_btn(frm) {
 				{
 					label: 'Report Type',
 					fieldname: 'report_type',
-					fieldtype: 'Select',
-					options: 'GET_GST_STR_ADHOC\nGET_AMAZON_FULFILLED_SHIPMENTS_DATA_GENERAL',
+					fieldtype: 'Link',
+					options: 'Amazon Report Type',
 					reqd: 1,
-					default: 'GET_GST_STR_ADHOC'
 				},
+				{
+					label: 'From Date',
+					fieldname: 'from_date',
+					fieldtype: 'Date',
+					default: frappe.datetime.add_days(frappe.datetime.get_today(), -1),
+					reqd: 1,
+				},
+				{
+					label: 'To Date',
+					fieldname: 'to_date',
+					fieldtype: 'Date',
+					default: frappe.datetime.get_today(),
+					reqd: 1,
+				}
 			],
 			primary_action_label: 'Sync',
 			primary_action(values) {
@@ -200,14 +213,18 @@ function handle_report_btn(frm) {
 					method: 'create_report',
 					doc: frm.doc,
 					args: {
-						report_type: values.report_type
+						report_type: values.report_type,
+						from_date: values.from_date,
+						to_date: values.to_date
 					},
 					freeze: true,
 					freeze_message: __("Creating Reports.."),
 					callback: (r) => {
-						console.log(r.message)
 						if (r && r.message) {
-							console.log(r.message);
+							frappe.show_alert({
+								message: __('Report created successfully.'),
+								indicator: 'green'
+							}, 5);
 						}
 					}
 				})
