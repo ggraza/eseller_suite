@@ -1,0 +1,142 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-02-16 16:53:14.003649",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "report_type",
+  "report_id",
+  "column_break_hnfr",
+  "data_from_date",
+  "data_to_date",
+  "check",
+  "section_break_thql",
+  "report_processing_status",
+  "report_document_id",
+  "file_processed",
+  "reference_dt",
+  "reference_dn",
+  "column_break_qrsj",
+  "report_url"
+ ],
+ "fields": [
+  {
+   "fieldname": "report_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Report Type",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "data_from_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Data From Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "data_to_date",
+   "fieldtype": "Date",
+   "label": "Data To Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "report_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Report ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_hnfr",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_thql",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "report_processing_status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Report Processing Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_qrsj",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "report_document_id",
+   "fieldtype": "Small Text",
+   "label": "Report Document ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "report_url",
+   "fieldtype": "Long Text",
+   "label": "Report URL",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "file_processed",
+   "fieldtype": "Check",
+   "label": "File Processed",
+   "read_only": 1
+  },
+  {
+   "depends_on": "file_processed",
+   "fieldname": "reference_dt",
+   "fieldtype": "Link",
+   "label": "Reference Dt",
+   "options": "DocType",
+   "read_only": 1
+  },
+  {
+   "depends_on": "file_processed",
+   "fieldname": "reference_dn",
+   "fieldtype": "Dynamic Link",
+   "label": "Reference Dn",
+   "options": "reference_dt",
+   "read_only": 1
+  },
+  {
+   "fieldname": "check",
+   "fieldtype": "Data",
+   "label": "Check"
+  }
+ ],
+ "grid_page_length": 50,
+ "in_create": 1,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-02-17 12:33:52.340394",
+ "modified_by": "Administrator",
+ "module": "eSeller Suite",
+ "name": "Amazon Report API Log",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
