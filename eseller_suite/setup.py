@@ -87,7 +87,14 @@ def get_item_custom_fields():
 				"label": "Is Actual Item",
 				"insert_after": "allow_alternative_item",
 				"depends_on": "eval: !doc.actual_item;"
-			}
+			},
+			{
+				"fieldname": "is_bundle_item",
+				"fieldtype": "Check",
+				"label": "Is Bundle Item",
+				"insert_after": "has_variants",
+				"hidden": 1,
+			},
 		]
 	}
 
@@ -404,7 +411,14 @@ def get_purchase_invoice_custom_fields():
 				"insert_after": "company",
 				"read_only": 1,
 				"no_copy": 1,
-			}
+			},
+			{
+				"fieldname": "bundle_items",
+				"fieldtype": "Table",
+				"label": "Bundle Items",
+				"insert_after": "items",
+				"options": "Purchase Invoice Item",
+			},
 		],
 		"Purchase Invoice Item": [
 			{
@@ -465,7 +479,14 @@ def get_purchase_invoice_custom_fields():
 				"insert_after": "wallet_topup",
 				"read_only": 1,
 				"no_copy": 1
-			}
+			},
+			{
+				"fieldname": "bundle_parent",
+				"fieldtype": "Data",
+				"label": "Bundle Parent",
+				"read_only": 1,
+				"insert_after": "item_name",
+			},
 		]
 	}
 
