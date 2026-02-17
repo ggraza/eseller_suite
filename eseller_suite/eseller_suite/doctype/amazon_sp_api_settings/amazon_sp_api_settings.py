@@ -348,7 +348,7 @@ class AmazonSPAPISettings(Document):
 				message=f"{error_msg}\nTraceback: {frappe.get_traceback()}"
 			)
 			frappe.throw(_(error_msg))
-	
+
 	def _extract_warehouses_from_orders(self):
 		"""Extract fulfillment center/warehouse information and supply source from existing Sales Orders"""
 		try:
@@ -452,6 +452,56 @@ class AmazonSPAPISettings(Document):
 			)
 			return {"status": "error", "fulfillment_centers": []}
 
+	@frappe.whitelist()
+	def create_report(self, report_type, from_date=today(), to_date=today()):
+		from_date_str = getdate(from_date).strftime("%Y-%m-%d")
+		from_date_str_tz = f"{from_date_str}T00:00:00Z"
+		to_date_str = getdate(to_date).strftime("%Y-%m-%d")
+		to_date_str_tz = f"{to_date_str}T23:59:59Z"
+		if not self.is_active:
+			frappe.throw(_("Please enable the Amazon SP API Settings first."))
+
+		from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api import (
+			ReportAPIs,
+		)
+
+		try:
+			# Initialize SupplySources API
+			report_api = ReportAPIs(
+				client_id=self.client_id,
+				client_secret=self.get_password("client_secret"),
+				refresh_token=self.refresh_token,
+				country_code=self.country,
+			)
+
+			try:
+				reports_response = report_api.create_report(
+					report_type=report_type,
+					data_start_time=from_date_str_tz,
+					data_end_time=to_date_str_tz
+				)
+				if reports_response and reports_response.get('reportId'):
+					create_report_api_log(
+						report_id=reports_response['reportId'],
+						report_type=report_type,
+						from_date=from_date,
+						to_date=to_date
+					)
+				return reports_response
+
+			except Exception as api_error:
+				# If the endpoint fails, log error and return
+				error_details = str(api_error)
+				frappe.log_error(title='Error creating Amazon report', message=f"Error details: {error_details}")
+				return None
+
+		except Exception as e:
+			error_msg = str(e)
+			frappe.log_error(
+				title="Error creating Amazon report",
+				message=f"Error: {error_msg}"
+			)
+			return None
 
 # Called via a hook in every hour.
 def schedule_get_order_details():
@@ -540,3 +590,18 @@ def enq_si_submit(sales_orders = []):
 						message=str(save_error)
 					)
 			continue
+
+def create_report_api_log(report_id, report_type, from_date, to_date):
+	try:
+		frappe.get_doc({
+			"doctype": "Amazon Report API Log",
+			"report_id": report_id,
+			"report_type": report_type,
+			"data_from_date": getdate(from_date),
+			"data_to_date": getdate(to_date)
+		}).insert(ignore_permissions=True)
+	except Exception as e:
+		frappe.log_error(
+			title="Failed to create Amazon Report API Log",
+			message=f"Report ID: {report_id}\nError: {str(e)}\nTraceback: {frappe.get_traceback()}"
+		)

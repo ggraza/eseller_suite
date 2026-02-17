@@ -4,6 +4,7 @@
 import urllib.parse
 
 import frappe
+import json
 from requests import request
 
 __all__ = [
@@ -125,7 +126,7 @@ class SPAPI(object):
 		raise exception
 
 	def get_headers(self) -> dict:
-		return {"x-amz-access-token": self.get_access_token()}
+		return {"x-amz-access-token": self.get_access_token(), "Content-Type": "application/json; charset=utf-8"}
 
 	def _mask_headers(
 		headers: dict,
@@ -357,6 +358,30 @@ class SupplySources(SPAPI):
 		if next_page_token:
 			params["nextPageToken"] = next_page_token
 		return self.make_request(append_to_base_uri=append_to_base_uri, params=params)
+
+
+class ReportAPIs(SPAPI):
+	BASE_URI = "/reports/2021-06-30/"
+
+	def create_report(self, report_type: str, data_start_time: str, data_end_time: str) -> dict:
+		"""Creates a report. Returns a reportId that can be used to retrieve the report when it's ready."""
+		data = json.dumps({
+			"reportType": report_type,
+			"dataStartTime": data_start_time,
+			"dataEndTime": data_end_time,
+			"marketplaceIds": [self.marketplace_id],
+		})
+		return self.make_request(method="POST", append_to_base_uri="reports", data=data)
+
+	def get_report_document(self, report_id: str) -> dict:
+		"""Return report document status along with report document id"""
+		append_to_base_uri = f"reports/{report_id}"
+		return self.make_request(append_to_base_uri=append_to_base_uri)
+
+	def get_report_document_url(self, report_doc_id: str) -> dict:
+		"""Returns the contents of a report document, if the report is available for retrieval. Returns a temporary URL to the report document in Amazon S3 if the report is ready for download."""
+		append_to_base_uri = f"documents/{report_doc_id}"
+		return self.make_request(append_to_base_uri=append_to_base_uri)
 
 
 class Util:
