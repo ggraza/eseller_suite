@@ -1,6 +1,16 @@
 frappe.ui.form.on('Stock Entry', {
 	refresh(frm) {
 		resrtict_actions_for_amazon_invoice(frm);
+<<<<<<< Updated upstream
+=======
+		frm.set_query("item_code", "bundle_items", function() {
+			return {
+				filters: {
+					is_bundle_item: 1
+				}
+			};
+		});
+>>>>>>> Stashed changes
 	}
 })
 
