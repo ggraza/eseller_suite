@@ -134,9 +134,9 @@ class AmazonSTNEntry(Document):
 			if target_wh:
 				row.target_warehouse = target_wh
 			else:
-				self.add_error_log(row,f"Target Warehouse not found for code: {row.target_fc} and company: {row.target_company}")
+				self.add_error_log(row, f"Target Warehouse not found for code: {row.target_fc} and company: {row.target_company}")
 		else:
-			self.add_error_log(row,f"Target Company not found for GSTIN: {row.target_gstin}")
+			self.add_error_log(row, f"Target Company not found for GSTIN: {row.target_gstin}")
 
 	def get_warehouse_by_code(self, code, row):
 		"""Get or create warehouse by Amazon code for given company."""
@@ -379,15 +379,6 @@ class AmazonSTNEntry(Document):
 				except Exception as e:
 					frappe.log_error(message=f"Failed to Cancel Purchase Invoice {row.sales_invoice} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Cancel Error")
 
-	def add_error_log(self, row, error_message):
-		"""Append error message to row's error_log safely."""
-		if row:
-			existing = frappe.db.get_value(row.doctype, row.name, "error_log") or ""
-			updated = f"{existing}\n{error_message}" if existing else error_message
-			frappe.db.set_value(row.doctype, row.name, "error_log", updated)
-		else:
-			frappe.log_error(message=f"Error log attempted but row is None: {error_message}", title="Amazon STN Entry Error")
-
 	def create_sales_invoice(self, row):
 		"""
 			Create Sales Invoice for Source Company
@@ -507,15 +498,31 @@ class AmazonSTNEntry(Document):
 			pi.bill_no = row.invoice_number
 			pi.update_stock = 1
 			pi.amazon_invoice_id = row.invoice_number
-			pi.set_warehouse = row.source_warehouse
+			pi.set_warehouse = row.target_warehouse
 			pi.disable_rounded_total = 1
 
+			# Adding all items to Items table to handle if only one bundle item
+			# Bundles will be removed from Purchase Invoice
 			pi.append("items", {
 				"item_code": row.item,
 				"qty": flt(row.qty),
 				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
 				"warehouse": row.target_warehouse
 			})
+
+			#Adding bundle Items to Bundle Items table
+			if not frappe.db.get_value('Item', row.item, 'is_stock_item'):
+				pi.append("bundle_items", {
+					"item_code": row.item,
+					"qty": flt(row.qty),
+					"stock_qty": flt(row.qty),
+					"uom": frappe.db.get_value('Item', row.item, 'stock_uom'),
+					"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+					"base_rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+					"amount": flt(row.taxable_value),
+					"base_amount": flt(row.taxable_value),
+					"warehouse": row.target_warehouse
+				})
 
 			if igst_account:
 				pi.append("taxes", {
