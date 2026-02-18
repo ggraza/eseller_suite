@@ -296,12 +296,6 @@ class AmazonSTNEntry(Document):
 			frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1})
 			return
 
-		is_stock_item = frappe.db.get_value("Item", row.item, "is_stock_item")
-		if not is_stock_item:
-			error_message = f"{row.item} is not a stock Item"
-			frappe.db.set_value(row.doctype, row.name, {"error_log": error_message,"stock_entry": None,"transactions_created": 0})
-			return
-
 		# Create Stock Entry
 		se = frappe.new_doc('Stock Entry')
 		se.stock_entry_type = stock_entry_type
@@ -312,14 +306,40 @@ class AmazonSTNEntry(Document):
 		se.amazon_invoice_id = row.invoice_number
 		se.from_warehouse = row.source_warehouse
 		se.to_warehouse = row.target_warehouse
-		se.append("items",{
-			"item_code": row.item,
-			"qty": flt(row.qty),
-			"s_warehouse": row.source_warehouse,
-			"t_warehouse": row.target_warehouse,
-			"basic_rate": flt(row.invoice_value) / flt(row.qty) if flt(row.qty) else 0,
-			"allow_zero_valuation_rate": 1
-		})
+
+		is_bundle_item = frappe.db.get_value('Item', row.item, 'is_bundle_item', )
+		is_stock_item = frappe.db.get_value("Item", row.item, "is_stock_item")
+		if not is_stock_item and not is_bundle_item:
+			error_message = f"{row.item} is not a stock Item and not a bundle item."
+			frappe.db.set_value(row.doctype, row.name, {"error_log": error_message,"stock_entry": None,"transactions_created": 0})
+			return
+
+		if is_stock_item:
+			se.append("items",{
+				"item_code": row.item,
+				"qty": flt(row.qty),
+				"transfer_qty": flt(row.qty),
+				"s_warehouse": row.source_warehouse,
+				"t_warehouse": row.target_warehouse,
+				"basic_rate": flt(row.invoice_value) / flt(row.qty) if flt(row.qty) else 0,
+				"allow_zero_valuation_rate": 1
+			})
+		#Adding bundle Items to Bundle Items table
+		if is_bundle_item:
+			se.append("bundle_items", {
+				"item_code": row.item,
+				"qty": flt(row.qty),
+				"transfer_qty": flt(row.qty),
+				"uom": frappe.db.get_value('Item', row.item, 'stock_uom'),
+				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+				"base_rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+				"amount": flt(row.taxable_value),
+				"base_amount": flt(row.taxable_value),
+				"s_warehouse": row.s_warehouse,
+				"t_warehouse": row.t_warehouse,
+				"conversion_factor": 1,
+				"allow_zero_valuation_rate": 1
+			})
 		se.insert(ignore_permissions=True)
 		frappe.db.set_value(row.doctype, row.name, {
 			"stock_entry": se.name,
