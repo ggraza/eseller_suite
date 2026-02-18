@@ -70,32 +70,43 @@ def populate_item_bundle(doc, method=None):
 
 	populated_items = []
 
-	# remove original bundle parent rows from items table
 	doc.items = [
 		row for row in doc.items
 		if not frappe.db.get_value("Item", row.item_code, "is_bundle_item")
 	]
 
-	# build populated children
 	for bundle in bundle_rows:
 		children = get_bundle_items(bundle.item_code) or []
 		for child in children:
+
 			qty = flt(child.get("qty")) * flt(bundle.qty)
+			rate = flt(child.get("rate"))
+
+			conversion_factor = 1
+			stock_uom = child["uom"]
+			stock_qty = qty
+
 			populated_items.append({
 				"item_code": child["item_code"],
 				"item_name": child["item_name"],
 				"qty": qty,
 				"uom": child["uom"],
-				"rate": flt(child.get("rate")),
-				"amount": qty * flt(child.get("rate")),
+				"stock_uom": stock_uom,
+				"conversion_factor": conversion_factor,
+				# "stock_qty": stock_qty,
+				"rate": rate,
+				"amount": qty * rate,
+				"base_rate": rate,
+				"base_amount": qty * rate,
 				"description": child.get("description"),
 				"warehouse": doc.set_warehouse,
 				"bundle_parent": bundle.name,
 				"bundle_qty": flt(child.get("qty")),
 				"item_tax_rate": '{}',
-				"taxable_value": 0
+				"taxable_value": qty * rate
 			})
 
-	# append children
 	for row in populated_items:
 		doc.append("items", row)
+
+	doc.set_missing_values()
