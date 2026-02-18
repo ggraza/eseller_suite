@@ -116,9 +116,19 @@ class AmazonSTNEntry(Document):
 
 	def map_companies_and_warehouses(self, row):
 		"""Map companies and warehouses for the STN row."""
+		# ToDo :: Except FC_TRANSFER
+		if row.transaction_type != 'FC_TRANSFER':
+			self.add_error_log(row, f"Transaction Type with {row.transaction_type} is not handled right now.")
+			row.ready_to_process = 0
+			return
+
 		# Set source company and warehouse
 		row.source_company = self.get_company_from_gstin(row.source_gstin)
 		if row.source_company:
+			if not row.source_fc:
+				row.source_warehouse = ''
+				self.add_error_log(row, f"Source Warehouse code is empty")
+				return
 			source_wh = self.get_warehouse_by_code(code=row.source_fc, row=row)
 			if source_wh:
 				row.source_warehouse = source_wh
@@ -130,6 +140,10 @@ class AmazonSTNEntry(Document):
 		# Set target company and warehouse
 		row.target_company = self.get_company_from_gstin(row.target_gstin)
 		if row.target_company:
+			if not row.target_fc:
+				row.target_fc = ''
+				self.add_error_log(row, f"Target Warehouse code is empty")
+				return
 			target_wh = self.get_warehouse_by_code(code=row.target_fc, row=row)
 			if target_wh:
 				row.target_warehouse = target_wh
@@ -511,7 +525,7 @@ class AmazonSTNEntry(Document):
 			})
 
 			#Adding bundle Items to Bundle Items table
-			if not frappe.db.get_value('Item', row.item, 'is_stock_item'):
+			if frappe.db.get_value('Item', row.item, 'is_bundle_item'):
 				pi.append("bundle_items", {
 					"item_code": row.item,
 					"qty": flt(row.qty),
@@ -552,7 +566,8 @@ class AmazonSTNEntry(Document):
 				frappe.db.set_value(row.doctype, row.name, "error_log", error_message)
 
 		except Exception as e:
-			self.add_error_log(row, f"Failed to create Purchase Invoice: {str(e)}")
+			exception_msg = f"Failed to create Purchase Invoice: {str(e)}"
+			self.add_error_log(row, exception_msg)
 
 	def handle_stock_movement_entries(self):
 		'''
