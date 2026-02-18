@@ -62,3 +62,41 @@ def get_bundle_items(bundle_item):
 
 	return bundle_items
 
+def populate_item_bundle(doc, method=None):
+	"""Expand bundle parent items into child items in Purchase Invoice."""
+
+	bundle_rows = doc.get("bundle_items") or []
+	if not bundle_rows:
+		return
+
+	populated_items = []
+
+	# remove original bundle parent rows from items table
+	doc.items = [
+		row for row in doc.items
+		if not frappe.db.get_value("Item", row.item_code, "is_bundle_item")
+	]
+
+	# build populated children
+	for bundle in bundle_rows:
+		children = get_bundle_items(bundle.item_code)
+
+		for child in children:
+			qty = flt(child.get("qty")) * flt(bundle.qty)
+
+			populated_items.append({
+				"item_code": child["item_code"],
+				"item_name": child["item_name"],
+				"qty": qty,
+				"uom": child["uom"],
+				"rate": flt(child.get("rate")),
+				"amount": qty * flt(child.get("rate")),
+				"description": child.get("description"),
+				"warehouse": doc.set_warehouse,
+				"bundle_parent": bundle.name,
+				"bundle_qty": flt(child.get("qty")),
+			})
+
+	# append children
+	for row in populated_items:
+		doc.append("items", row)
