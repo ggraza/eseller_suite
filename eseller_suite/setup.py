@@ -555,7 +555,14 @@ def get_stock_entry_custom_fields():
 				"label": "Serial Nos",
 				"insert_after": "new_seral_section",
 				"description": "Barcode numbers should be seprated by line break",
-			}
+			},
+			{
+				"fieldname": "bundle_parent",
+				"fieldtype": "Data",
+				"label": "Bundle Parent",
+				"read_only": 1,
+				"insert_after": "item_name",
+			},
 		],
 		"Stock Entry": [
 			{
@@ -572,6 +579,13 @@ def get_stock_entry_custom_fields():
 				"read_only": 1,
 				"insert_after": "ewaybill",
 				"no_copy": 1
+			},
+			{
+				"fieldname": "bundle_items",
+				"fieldtype": "Table",
+				"label": "Bundle Items",
+				"insert_after": "items",
+				"options": "Stock Entry Detail",
 			},
 		]
 	}
