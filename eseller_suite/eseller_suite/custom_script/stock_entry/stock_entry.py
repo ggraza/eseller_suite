@@ -93,7 +93,7 @@ def get_bundle_items(bundle_item):
 	return result
 
 def populate_item_bundle(doc, method=None):
-	"""Expand bundle parent items into child items in Stoc Invoice."""
+	"""Expand bundle parent items into child items in Stock Entry."""
 	bundle_rows = doc.get("bundle_items")
 	if not bundle_rows:
 		return
