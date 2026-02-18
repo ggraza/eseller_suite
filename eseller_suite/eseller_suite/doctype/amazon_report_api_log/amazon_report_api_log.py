@@ -16,10 +16,12 @@ class AmazonReportAPILog(Document):
 		if self.report_url and not self.file_processed:
 			if self.report_type == 'GET_GST_STR_ADHOC':
 				self.handle_file_upload('Amazon STN Entry', 'stn_file')
+			elif self.report_type == 'GET_AMAZON_FULFILLED_SHIPMENTS_DATA_GENERAL':
+				self.handle_file_upload('AFN Order Shipment Entry', 'afn_shipment_file', 1)
 			else:
 				self.handle_file_upload()
 
-	def handle_file_upload(self, dt=None, df=None):
+	def handle_file_upload(self, dt=None, df=None, submit=0):
 		# Get CSV text + original filename
 		csv_text, filename = _unwrap_and_decode(
 			requests.get(self.report_url, timeout=60).content
@@ -49,6 +51,11 @@ class AmazonReportAPILog(Document):
 			})
 			doc.flags.ignore_mandatory = True
 			doc.save()
+			if submit:
+				try:
+					doc.submit()
+				except:
+					pass
 			self.reference_dt = doc.doctype
 			self.reference_dn = doc.name
 		self.file_processed = 1
