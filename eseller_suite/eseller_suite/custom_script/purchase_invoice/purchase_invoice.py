@@ -64,7 +64,6 @@ def get_bundle_items(bundle_item):
 
 def populate_item_bundle(doc, method=None):
 	"""Expand bundle parent items into child items in Purchase Invoice."""
-
 	bundle_rows = doc.get("bundle_items") or []
 	if not bundle_rows:
 		return
@@ -79,11 +78,9 @@ def populate_item_bundle(doc, method=None):
 
 	# build populated children
 	for bundle in bundle_rows:
-		children = get_bundle_items(bundle.item_code)
-
+		children = get_bundle_items(bundle.item_code) or []
 		for child in children:
 			qty = flt(child.get("qty")) * flt(bundle.qty)
-
 			populated_items.append({
 				"item_code": child["item_code"],
 				"item_name": child["item_name"],
@@ -95,6 +92,8 @@ def populate_item_bundle(doc, method=None):
 				"warehouse": doc.set_warehouse,
 				"bundle_parent": bundle.name,
 				"bundle_qty": flt(child.get("qty")),
+				"item_tax_rate": '{}',
+				"taxable_value": 0
 			})
 
 	# append children
