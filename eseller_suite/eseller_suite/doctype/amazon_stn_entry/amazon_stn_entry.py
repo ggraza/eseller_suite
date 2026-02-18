@@ -612,3 +612,26 @@ class AmazonSTNEntry(Document):
 				self.create_sales_invoice(stn_row)
 				self.create_purchase_invoice(stn_row)
 				frappe.db.set_value(stn_row.doctype, stn_row.name, "transactions_created", 1)
+
+	@frappe.whitelist()
+	def retry_fetching_data(self):
+		"""
+			Fetch missing Company, Warehouse, Item etc.
+		"""
+		updated = False
+
+		for row in self.stn_entries:
+			if not row.ready_to_process:
+				updated = True
+				row.error_log = ""
+				self.map_companies_and_warehouses(row)
+				self.map_and_update_item(row)
+				self.set_ready_to_process(row)
+
+		if updated:
+			self.save()
+			frappe.msgprint("Updated Successfully", alert=True, indicator="green")
+			return 1
+
+		frappe.msgprint("Nothing to Update", alert=True, indicator="orange")
+		return 0
