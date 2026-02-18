@@ -1,4 +1,6 @@
 import frappe
+from frappe.model import _
+from frappe.model.base_document import flt
 
 def transfer_barcodes(doc, method=None):
     """method transfers the barcodes on submit
@@ -53,3 +55,39 @@ def on_canel(doc, method):
 		"Serial and Batch Bundle",
 		"Amazon STN Entry",
 	)
+
+@frappe.whitelist()
+def get_bundle_items(bundle_item):
+	"""
+	method fetches the child items of a bundle item to be added in the stock entry items table
+	"""
+	if not bundle_item:
+		return []
+
+	if not frappe.db.exists("Product Bundle", bundle_item):
+		frappe.log_error(_("Product Bundle {0} does not exist").format(bundle_item))
+		return []
+
+	bundle_items = frappe.get_all(
+		"Product Bundle Item",
+		filters={"parent": bundle_item},
+		fields=["item_code", "qty", "description"],
+		order_by="idx"
+	)
+	result = []
+	for row in bundle_items:
+		item_details = frappe.get_cached_value(
+			"Item",
+			row.item_code,
+			["item_name", "stock_uom", "standard_rate"],
+			as_dict=True
+		)
+		result.append({
+			"item_code": row.item_code,
+			"item_name": item_details.item_name if item_details else "",
+			"qty": flt(row.qty),
+			"uom": item_details.stock_uom,
+			"rate": item_details.standard_rate if item_details else 0,
+			"description": row.description
+		})
+	return result
