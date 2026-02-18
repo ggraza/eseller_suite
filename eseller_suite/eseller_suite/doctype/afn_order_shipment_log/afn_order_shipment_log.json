@@ -1,0 +1,188 @@
+{
+ "actions": [],
+ "allow_copy": 1,
+ "autoname": "hash",
+ "creation": "2026-02-18 10:35:31.237290",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "afn_order_shipment_entry",
+  "amazon_order_id",
+  "shipment_id",
+  "amazon_order_item_id",
+  "tracking_number",
+  "column_break_hdiw",
+  "merchant_sku",
+  "qty",
+  "item_price",
+  "item_tax",
+  "fc_code",
+  "section_break_dojc",
+  "item_code",
+  "warehouse",
+  "company",
+  "invoice_created",
+  "has_exceptions",
+  "column_break_zxol",
+  "exceptions"
+ ],
+ "fields": [
+  {
+   "fieldname": "afn_order_shipment_entry",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "AFN Order Shipment Entry",
+   "options": "AFN Order Shipment Entry",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "amazon_order_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Amazon Order ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "shipment_id",
+   "fieldtype": "Data",
+   "label": "Shipment ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amazon_order_item_id",
+   "fieldtype": "Data",
+   "label": "Amazon Order Item ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "merchant_sku",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Merchant SKU",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_price",
+   "fieldtype": "Currency",
+   "label": "Item Price",
+   "read_only": 1
+  },
+  {
+   "fieldname": "item_tax",
+   "fieldtype": "Currency",
+   "label": "Item Tax",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tracking_number",
+   "fieldtype": "Data",
+   "label": "Tracking Number",
+   "read_only": 1
+  },
+  {
+   "fieldname": "fc_code",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "FC Code",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_hdiw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_dojc",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item Code",
+   "options": "Item",
+   "read_only": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "read_only": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_zxol",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "exceptions",
+   "fieldtype": "Long Text",
+   "label": "Exceptions",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "invoice_created",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Invoice Created",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "has_exceptions",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Has Exceptions",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "in_create": 1,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-02-18 12:42:22.780553",
+ "modified_by": "Administrator",
+ "module": "eSeller Suite",
+ "name": "AFN Order Shipment Log",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "amazon_order_id"
+}

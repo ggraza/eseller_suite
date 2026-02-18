@@ -1,0 +1,87 @@
+{
+ "actions": [],
+ "allow_copy": 1,
+ "allow_rename": 1,
+ "autoname": "AFN-OSE-.#####",
+ "creation": "2026-02-18 10:31:28.271259",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_dwsi",
+  "afn_shipment_file",
+  "amended_from",
+  "column_break_etmw",
+  "posting_date"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_dwsi",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "AFN Order Shipment Entry",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "afn_shipment_file",
+   "fieldtype": "Attach",
+   "in_list_view": 1,
+   "label": "AFN Shipment File",
+   "no_copy": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_etmw",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Today",
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Posting Date",
+   "reqd": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [
+  {
+   "link_doctype": "AFN Order Shipment Log",
+   "link_fieldname": "afn_order_shipment_entry"
+  }
+ ],
+ "modified": "2026-02-18 12:51:36.235147",
+ "modified_by": "Administrator",
+ "module": "eSeller Suite",
+ "name": "AFN Order Shipment Entry",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
