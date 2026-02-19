@@ -521,6 +521,15 @@ class AmazonRepository:
 		item_code = None
 		if frappe.db.exists("Item", {"amazon_item_code": order_item["ASIN"]}):
 			return frappe.db.get_value("Item", {"amazon_item_code": order_item["ASIN"]})
+		if not self.amz_setting.create_item_if_not_exists:
+			# Record failed sync attempt
+			error_message = f"Failed to create Sales Order against Amazon Order ID : {order_id}. Item with ASIN : {order_item.get('ASIN')} and SKU {order_item.get('SellerSKU')} not found."
+			if not frappe.db.exists("Amazon Failed Sync Record", { "amazon_order_id": order_id, "remarks":error_message }):
+				failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
+				failed_sync_record.amazon_order_id = order_id
+				failed_sync_record.remarks = error_message
+				failed_sync_record.save(ignore_permissions=True)
+			return None
 		try:
 			item_code = self.create_item(order_item, order_id)
 		except Exception as e:
