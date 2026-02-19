@@ -9,6 +9,7 @@
  "field_order": [
   "section_break_5lye",
   "stn_file",
+  "ready_to_process",
   "column_break_szum",
   "posting_date",
   "amended_from",
@@ -73,13 +74,24 @@
    "fieldname": "error_messages_html",
    "fieldtype": "HTML",
    "label": "Error Messages HTML"
+  },
+  {
+   "default": "0",
+   "fieldname": "ready_to_process",
+   "fieldtype": "Check",
+   "hidden": 1,
+   "label": "Ready To Process",
+   "no_copy": 1,
+   "print_hide": 1,
+   "read_only": 1,
+   "report_hide": 1
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-13 14:26:01.580801",
+ "modified": "2026-02-19 10:01:14.708829",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon STN Entry",

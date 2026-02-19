@@ -20,6 +20,7 @@ class AmazonSTNEntry(Document):
 	def validate(self):
 		if not self.stn_entries:
 			self.process_stn_file()
+		self.set_ready_to_process_doc()
 
 	def on_submit(self):
 		self.handle_stock_movement_entries()
@@ -245,6 +246,12 @@ class AmazonSTNEntry(Document):
 		else:
 			row.ready_to_process = 0
 
+	def set_ready_to_process_doc(self):
+		'''
+			Method to set ready_to_process on doc level if all row are ready to process
+		'''
+		self.ready_to_process = all(row.ready_to_process for row in self.stn_entries)
+
 	@frappe.whitelist()
 	def get_error_message_html(self):
 		"""
@@ -252,6 +259,7 @@ class AmazonSTNEntry(Document):
 		"""
 		# Collect rows first (faster than string concatenation in loop)
 		error_rows = []
+		error_count_str = ''
 
 		for entry in self.stn_entries:
 			if entry.error_log:
@@ -264,6 +272,7 @@ class AmazonSTNEntry(Document):
 			return ""
 
 		error_content = "<br><br>".join(error_rows)
+		error_count_str = str(len(error_rows))
 
 		error_html = f"""
 			<div style="max-height: 300px; overflow-y: auto;">
@@ -275,7 +284,7 @@ class AmazonSTNEntry(Document):
 					z-index: 10;
 				">
 					<strong style="color: #f00;">
-						Errors found in the uploaded STN file:
+						{error_count_str} error rows were found in the uploaded STN file :
 					</strong>
 				</div>
 				<div style="padding: 10px;">
