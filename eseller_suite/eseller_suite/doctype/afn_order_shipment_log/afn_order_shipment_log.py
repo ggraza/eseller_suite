@@ -58,3 +58,22 @@ def retry_fetching_selected_logs(docnames):
 				doc.set_missing_values()
 				doc.save()
 	return "Success"
+
+@frappe.whitelist()
+def check_so_existance_and_rq_job(amazon_order_id, amz_setting_name):
+	'''
+		Method to check wether RQ Job for Get Order is working or not. Along with Sales Order existance for given Order ID
+	'''
+	scheduler_rq_jobs = frappe.db.get_all('RQ Job', {
+		'job_name': 'eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.schedule_get_order_details',
+		'status': ['in', ['queued', 'started']]
+	})
+	sync_rq_jobs = frappe.db.get_all('RQ Job', {
+		'job_name': f'Get Amazon Orders - {amz_setting_name}',
+		'status': ['in', ['queued', 'started']]
+	})
+	if scheduler_rq_jobs or sync_rq_jobs:
+		return 0
+	if frappe.db.exists('Sales Order', { 'amazon_order_id':amazon_order_id, 'docstatus':['!=', 2] }):
+		return 0
+	return 1

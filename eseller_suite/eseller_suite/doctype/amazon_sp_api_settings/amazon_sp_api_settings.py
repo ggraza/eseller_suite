@@ -453,7 +453,11 @@ class AmazonSPAPISettings(Document):
 			return {"status": "error", "fulfillment_centers": []}
 
 	@frappe.whitelist()
-	def create_report(self, report_type, from_date=today(), to_date=today()):
+	def create_report(self, report_type, from_date=None, to_date=None):
+		if not from_date:
+			from_date = today()
+		if not to_date:
+			to_date = today()
 		from_date_str = getdate(from_date).strftime("%Y-%m-%d")
 		from_date_str_tz = f"{from_date_str}T00:00:00Z"
 		to_date_str = getdate(to_date).strftime("%Y-%m-%d")
