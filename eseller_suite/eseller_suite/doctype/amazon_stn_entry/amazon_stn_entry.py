@@ -335,8 +335,8 @@ class AmazonSTNEntry(Document):
 				"base_rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
 				"amount": flt(row.taxable_value),
 				"base_amount": flt(row.taxable_value),
-				"s_warehouse": row.s_warehouse,
-				"t_warehouse": row.t_warehouse,
+				"s_warehouse": row.source_warehouse,
+				"t_warehouse": row.target_warehouse,
 				"conversion_factor": 1,
 				"allow_zero_valuation_rate": 1
 			})
