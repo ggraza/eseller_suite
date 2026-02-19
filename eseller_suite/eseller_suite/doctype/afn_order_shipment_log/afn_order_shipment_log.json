@@ -133,6 +133,7 @@
   {
    "fieldname": "exceptions",
    "fieldtype": "Long Text",
+   "in_list_view": 1,
    "label": "Exceptions",
    "read_only": 1
   },
@@ -140,7 +141,6 @@
    "default": "0",
    "fieldname": "invoice_created",
    "fieldtype": "Check",
-   "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Invoice Created",
    "read_only": 1
@@ -159,7 +159,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-18 12:42:22.780553",
+ "modified": "2026-02-19 11:26:22.081419",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "AFN Order Shipment Log",

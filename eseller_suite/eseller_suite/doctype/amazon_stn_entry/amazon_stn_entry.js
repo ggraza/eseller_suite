@@ -4,9 +4,10 @@
 frappe.ui.form.on("Amazon STN Entry", {
 	refresh(frm) {
 		if (!frm.is_new()) {
+			set_introduction_texts(frm);
 			set_error_messages_html(frm);
+			hanlde_retry_btn(frm);
 		}
-		hanlde_retry_btn(frm);
 	},
 	stn_file(frm) {
 		if (!frm.doc.stn_file) {
@@ -15,6 +16,25 @@ frappe.ui.form.on("Amazon STN Entry", {
 		}
 	}
 });
+
+function set_introduction_texts(frm) {
+	if (frm.doc.docstatus === 0) {
+		frm.set_intro('');
+		if (frm.doc.ready_to_process) {
+			frm.set_intro('Please set the value of description', 'green');
+		}
+		else {
+			frm.set_intro(
+				__('Please <a class="jump-exceptions" style="cursor:pointer;">check the exceptions</a> before submitting.'),
+				'red'
+			);
+
+			frm.page.wrapper.on('click', '.jump-exceptions', function () {
+				frm.scroll_to_field('error_messages_html');
+			});
+		}
+	}
+}
 
 function set_error_messages_html(frm) {
 	frm.call('get_error_message_html').then(r => {
@@ -33,8 +53,9 @@ function set_error_messages_html(frm) {
 }
 
 function hanlde_retry_btn(frm) {
-	if (frm.doc.docstatus === 0 && !frm.is_new()) {
-		frm.add_custom_button('Re-try', () => {
+	if (frm.doc.docstatus === 0) {
+		frm.add_custom_button('Re-try Fetching', () => {
+			frm.remove_custom_button('Re-try Fetching');
 			frm.call('retry_fetching_data').then(r => {
 				if (r.message) {
 					frm.reload_doc();

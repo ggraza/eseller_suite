@@ -21,6 +21,7 @@ class AFNOrderShipmentLog(Document):
 		'''
 			Set missing values like Item, Warehosue and Company
 		'''
+		self.exceptions = ''
 		#Setting Item
 		if self.merchant_sku and not self.item_code:
 			if frappe.db.exists('Item', self.merchant_sku):
@@ -41,3 +42,19 @@ class AFNOrderShipmentLog(Document):
 		if self.company and self.warehouse and self.item_code:
 			self.exceptions = ''
 		self.has_exceptions = 1 if self.exceptions else 0
+
+@frappe.whitelist()
+def retry_fetching_selected_logs(docnames):
+	'''
+		Method to fetch missing values form list view
+	'''
+	if isinstance(docnames, str):
+		docnames = frappe.parse_json(docnames)
+
+	for name in docnames:
+		if frappe.db.exists("AFN Order Shipment Log", name):
+			doc = frappe.get_doc("AFN Order Shipment Log", name)
+			if doc.has_exceptions:
+				doc.set_missing_values()
+				doc.save()
+	return "Success"
