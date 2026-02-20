@@ -1354,7 +1354,7 @@ class AmazonRepository:
 			)
 			so.transaction_date = get_datetime(transaction_date).strftime("%Y-%m-%d")
 			so.transaction_time = get_datetime(transaction_date).strftime("%H:%M:%S")
-			so.company = self.amz_setting.company
+			company = self.amz_setting.company
 			warehouse = self.amz_setting.warehouse
 			if so.fulfillment_channel:
 				if so.fulfillment_channel == "AFN":
@@ -1362,6 +1362,12 @@ class AmazonRepository:
 			if self.amz_setting.temporary_stock_transfer_required:
 				warehouse = self.amz_setting.temporary_order_warehouse
 
+			if self.amz_setting.fc_based_invoice_creation:
+				if so.company:
+					company = so.company
+				if so.set_warehouse:
+					warehouse = so.set_warehouse
+			so.company = company
 			so.set_warehouse = warehouse
 
 			items = self.get_order_items(order_id)
@@ -1590,7 +1596,11 @@ class AmazonRepository:
 					else True
 				)
 
-				if order_status_valid and has_taxes and transfer_exists:
+				fc_data_exists = True
+				if self.amz_setting.fc_based_invoice_creation:
+					fc_data_exists = True if so.fc_location else False
+
+				if order_status_valid and has_taxes and transfer_exists and fc_data_exists:
 					try:
 						so.submit()
 					except Exception as e:

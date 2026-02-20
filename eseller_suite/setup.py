@@ -197,7 +197,15 @@ def get_sales_order_custom_fields():
 				"read_only": 1,
 				"no_copy": 1,
 				"options": "Cancelled Order Items",
-			}
+			},
+			{
+				"fieldname": "fc_location",
+				"fieldtype": "Data",
+				"label": "FC Location",
+				"insert_after": "set_warehouse",
+				"read_only": 1,
+				"no_copy": 1,
+			},
 		],
 		"Sales Order Item": [
 			{
