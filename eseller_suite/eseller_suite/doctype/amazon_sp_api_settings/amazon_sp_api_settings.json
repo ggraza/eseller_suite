@@ -32,6 +32,7 @@
   "taxes_charges",
   "sync_selected_date_only",
   "sync_orders",
+  "fc_based_invoice_creation",
   "column_break_4",
   "enable_sync",
   "max_retry_limit",
@@ -275,10 +276,17 @@
    "fieldtype": "Link",
    "label": "Amazon Customer",
    "options": "Customer"
+  },
+  {
+   "default": "0",
+   "description": "Invoice Creation will be based on FC's Company and Warehouse",
+   "fieldname": "fc_based_invoice_creation",
+   "fieldtype": "Check",
+   "label": "FC Based Invoice Creation"
   }
  ],
  "links": [],
- "modified": "2026-02-09 16:49:56.225137",
+ "modified": "2026-02-20 10:33:32.551297",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon SP API Settings",

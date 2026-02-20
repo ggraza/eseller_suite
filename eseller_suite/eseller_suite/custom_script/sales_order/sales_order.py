@@ -1,15 +1,18 @@
 import frappe
+from frappe import _
+from frappe.utils import cint, flt
+from frappe.model.mapper import get_mapped_doc
+from frappe.model.utils import get_fetch_values
+from frappe.contacts.doctype.address.address import get_company_address
+
 from erpnext.accounts.party import get_party_account
 from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from erpnext.stock.doctype.item.item import get_item_defaults
 from erpnext.stock.utils import get_stock_balance
-from frappe import _
-from frappe.contacts.doctype.address.address import get_company_address
-from frappe.model.mapper import get_mapped_doc
-from frappe.model.utils import get_fetch_values
-from frappe.utils import cint, flt
+from erpnext.stock.doctype.packed_item.packed_item import make_packing_list
 
+import re
 
 class SalesOrderOverride(SalesOrder):
 	def custom_validate(self):
@@ -43,6 +46,7 @@ class SalesOrderOverride(SalesOrder):
 		self.custom_validate()
 		recall_order_prefixes = ['S']
 		super(SalesOrderOverride, self).validate()
+		self.process_fc_based_changes()
 		if self.amazon_order_status != 'Canceled' and not self.amazon_order_amount and self.amazon_order_id and self.amazon_order_id[0] not in recall_order_prefixes:
 			self.amazon_order_amount = self.total
 		if self.amazon_order_id and self.amazon_order_id[0] in recall_order_prefixes:
@@ -153,6 +157,122 @@ class SalesOrderOverride(SalesOrder):
 				title=_("Invalid Sales Order Submission"),
 				exc=frappe.ValidationError
 			)
+
+	def process_fc_based_changes(self):
+		"""
+			Handle FC-based warehouse & company changes.
+			Supports multiple logs per item_code (qty split across warehouses).
+		"""
+
+		if not self.amazon_order_id:
+			return
+
+		shipment_logs = frappe.db.get_all(
+			'AFN Order Shipment Log',
+			filters={'amazon_order_id': self.amazon_order_id},
+			fields=['fc_code', 'item_code', 'warehouse', 'company', 'qty']
+		)
+
+		if not shipment_logs:
+			return
+
+		# Group logs by item_code
+		from collections import defaultdict
+		log_map = defaultdict(list)
+
+		for log in shipment_logs:
+			log_map[log.item_code].append(log)
+
+		has_company_change = False
+		new_items = []
+
+		for row in self.items:
+			logs = log_map.get(row.item_code)
+
+			# If no matching logs → keep row as is
+			if not logs:
+				new_items.append(row)
+				continue
+
+			remaining_qty = row.qty
+
+			for log in logs:
+				if remaining_qty <= 0:
+					break
+
+				split_qty = min(remaining_qty, log.qty)
+				remaining_qty -= split_qty
+
+				# Duplicate row
+				new_row = row.as_dict()
+				new_row["qty"] = split_qty
+				new_row["warehouse"] = log.warehouse
+				new_items.append(new_row)
+
+				if self.company != log.company:
+					has_company_change = True
+				# Update header values based on first match
+				self.company = log.company
+				self.set_warehouse = log.warehouse
+				self.fc_location = log.fc_code
+
+		# Clear and re-add items
+		self.set("items", [])
+		for d in new_items:
+			self.append("items", d)
+
+		if has_company_change:
+			self.handle_company_changes()
+
+		make_packing_list(self)
+
+	def handle_company_changes(self):
+		'''
+			Method to change all fields relevent to company
+		'''
+		self.company_address = get_company_address(self.company).get('company_address') or ''
+		print("self.company_address : ", self.company_address)
+		company_abr, default_cc = frappe.db.get_value('Company', self.company, ['abbr', 'cost_center'])
+		for row in self.items:
+			if row.cost_center:
+				current_cc = row.cost_center
+				new_cc = re.sub(r"-[^-]*$", f"- {company_abr}", current_cc)
+				row.cost_center = new_cc if frappe.db.exists('Cost Center', new_cc) else default_cc
+				print("Cost center changed to : ", row.cost_center)
+			if row.item_tax_template:
+				current_tax_temp = row.item_tax_template
+				new_tax_temp = re.sub(r"-[^-]*$", f"- {company_abr}", current_tax_temp)
+				row.item_tax_template = new_tax_temp if frappe.db.exists('Item Tax Template', new_tax_temp) else ''
+				print("Item Tax template changed to ", row.item_tax_template)
+		self.packed_items = []
+
+		for row in self.taxes:
+			if row.cost_center:
+				current_cc = row.cost_center
+				new_cc = re.sub(r"-[^-]*$", f"- {company_abr}", current_cc)
+				row.cost_center = new_cc if frappe.db.exists('Cost Center', new_cc) else default_cc
+				print("Cost center changed to : ", row.cost_center)
+			if row.account_head:
+				row.account_head = get_account_head(row.account_head, self.company)
+				print("account_head changed to : ", row.account_head)
+
+
+def get_account_head(current_acc, company):
+	'''
+		Get account head based on company
+	'''
+	company_abr = frappe.db.get_value('Company', company, 'abbr')
+	new_account = re.sub(r"-[^-]*$", f"- {company_abr}", current_acc)
+	if frappe.db.exists('Account', new_account):
+		return new_account
+	current_acc_parent = frappe.db.get_value('Account', current_acc, 'parent_account')
+	new_account_doc = frappe.new_doc("Account")
+	new_account_doc.account_name = current_acc.rsplit("-", 1)[0].strip()
+	new_account_doc.company = company
+	new_account_doc.parent_account = get_account_head(current_acc_parent, company)
+	new_account_doc.insert(ignore_permissions=True)
+	return new_account_doc.name
+
 
 @frappe.whitelist()
 def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
