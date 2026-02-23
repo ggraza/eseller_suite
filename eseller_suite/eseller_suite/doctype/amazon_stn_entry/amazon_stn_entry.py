@@ -10,6 +10,8 @@ import os
 import csv
 from charset_normalizer import from_path
 
+from eseller_suite.eseller_suite.utils import add_bundle_components_to_stock_entry
+
 class AmazonSTNEntry(Document):
 	def submit(self):
 		if len(self.stn_entries) > 50:
@@ -323,17 +325,21 @@ class AmazonSTNEntry(Document):
 			frappe.db.set_value(row.doctype, row.name, {"error_log": error_message,"stock_entry": None,"transactions_created": 0})
 			return
 
-		if is_stock_item:
-			se.append("items",{
-				"item_code": row.item,
-				"qty": flt(row.qty),
-				"transfer_qty": flt(row.qty),
-				"s_warehouse": row.source_warehouse,
-				"t_warehouse": row.target_warehouse,
-				"basic_rate": flt(row.invoice_value) / flt(row.qty) if flt(row.qty) else 0,
-				"allow_zero_valuation_rate": 1
-			})
-		#Adding bundle Items to Bundle Items table
+		se.append("items",{
+			"item_code": row.item,
+			"qty": flt(row.qty),
+			"transfer_qty": flt(row.qty),
+			"uom": frappe.db.get_value('Item', row.item, 'stock_uom'),
+			"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+			"base_rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+			"amount": flt(row.taxable_value),
+			"base_amount": flt(row.taxable_value),
+			"s_warehouse": row.source_warehouse,
+			"t_warehouse": row.target_warehouse,
+			"conversion_factor": 1,
+			"basic_rate": flt(row.invoice_value) / flt(row.qty) if flt(row.qty) else 0,
+			"allow_zero_valuation_rate": 1
+		})
 		if is_bundle_item:
 			se.append("bundle_items", {
 				"item_code": row.item,
@@ -349,13 +355,15 @@ class AmazonSTNEntry(Document):
 				"conversion_factor": 1,
 				"allow_zero_valuation_rate": 1
 			})
+			add_bundle_components_to_stock_entry(se=se,bundle_item_code=row.item,bundle_qty=row.qty,source_warehouse=row.source_warehouse,target_warehouse=row.target_warehouse)
+		se.flags.ignore_validate = True
+		se.flags.ignore_mandatory = True
 		se.insert(ignore_permissions=True)
 		frappe.db.set_value(row.doctype, row.name, {
 			"stock_entry": se.name,
 			"transactions_created": 1,
 			"error_log": ""
 		})
-
 		# Submit Stock Entry with error handling
 		frappe.db.savepoint("before_stn_stock_entry_submit")
 		try:
@@ -468,7 +476,8 @@ class AmazonSTNEntry(Document):
 				"item_code": row.item,
 				"qty": flt(row.qty),
 				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
-				"warehouse": row.source_warehouse
+				"warehouse": row.source_warehouse,
+				"allow_zero_valuation_rate": 1
 			})
 
 			if igst_account:
