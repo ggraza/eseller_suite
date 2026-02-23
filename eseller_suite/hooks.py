@@ -153,6 +153,7 @@ doc_events = {
 	},
 	'Product Bundle':{
         "after_insert": "eseller_suite.eseller_suite.custom_script.product_bundle.product_bundle.mark_item_as_bundle",
+		"validate": "eseller_suite.eseller_suite.custom_script.product_bundle.product_bundle.validate_product_bundle_items",
     },
 }
 
