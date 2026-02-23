@@ -92,39 +92,3 @@ def get_bundle_items(bundle_item):
 		})
 	return result
 
-def populate_item_bundle(doc, method=None):
-	"""Expand bundle parent items into child items in Stock Entry."""
-	bundle_rows = doc.get("bundle_items")
-	if not bundle_rows:
-		return
-
-	populated_items = []
-	doc.items = [
-		row for row in doc.items
-		if not frappe.db.get_value("Item", row.item_code, "is_bundle_item")
-	]
-
-	for bundle in bundle_rows:
-		children = get_bundle_items(bundle.item_code)
-		for child in children:
-			qty = flt(child.get("qty")) * flt(bundle.qty)
-			populated_items.append({
-				"item_code": child["item_code"],
-				"item_name": child["item_name"],
-				"qty": qty,
-				"transfer_qty": qty,
-				"uom": child["uom"],
-				"stock_uom": child["uom"],
-				"rate": flt(child.get("rate")),
-				"amount": qty * flt(child.get("rate")),
-				"description": child.get("description"),
-				"bundle_parent": bundle.name,
-				"bundle_qty": flt(child.get("qty")),
-				"item_tax_rate": '{}',
-				"taxable_value": 0,
-				"conversion_factor": 1,
-				"allow_zero_valuation_rate": 1,
-			})
-
-	for row in populated_items:
-		doc.append("items", row)
