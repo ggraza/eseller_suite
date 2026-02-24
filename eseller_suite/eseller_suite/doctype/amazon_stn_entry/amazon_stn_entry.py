@@ -296,6 +296,59 @@ class AmazonSTNEntry(Document):
 		"""
 		return error_html
 
+	def add_item_to_stock_entry(self, se, row):
+		"""
+		Common method to add stock item or bundle item to Stock Entry.
+		Returns True if item added successfully, else False.
+		"""
+		item_details = frappe.db.get_value("Item",row.item,["is_stock_item", "is_bundle_item", "stock_uom"],as_dict=True)
+
+		if not item_details:
+			return False
+
+		is_stock_item = item_details.is_stock_item
+		is_bundle_item = item_details.is_bundle_item
+		stock_uom = item_details.stock_uom
+
+		if not is_stock_item and not is_bundle_item:
+			return False
+
+		qty = flt(row.qty)
+		basic_rate = flt(row.invoice_value) / qty if qty else 0
+		tax_rate = flt(row.taxable_value) / qty if qty else 0
+
+		if is_stock_item:
+			se.append("items", {
+				"item_code": row.item,
+				"qty": qty,
+				"transfer_qty": qty,
+				"uom": stock_uom,
+				"s_warehouse": row.source_warehouse,
+				"t_warehouse": row.target_warehouse,
+				"basic_rate": basic_rate,
+				"conversion_factor": 1,
+				"allow_zero_valuation_rate": 1
+			})
+
+		elif is_bundle_item:
+			se.append("bundle_items", {
+				"item_code": row.item,
+				"qty": qty,
+				"transfer_qty": qty,
+				"uom": stock_uom,
+				"rate": tax_rate,
+				"base_rate": tax_rate,
+				"amount": flt(row.taxable_value),
+				"base_amount": flt(row.taxable_value),
+				"s_warehouse": row.source_warehouse,
+				"t_warehouse": row.target_warehouse,
+				"conversion_factor": 1,
+				"allow_zero_valuation_rate": 1
+			})
+
+			add_bundle_components_to_stock_entry(se=se, bundle_item_code=row.item, bundle_qty=qty, source_warehouse=row.source_warehouse, target_warehouse=row.target_warehouse)
+		return True
+
 	def create_stock_entries_for_material_transfer(self, row, stock_entry_type):
 		"""
 			Create Stock Entries for rows where Source Company equals Target Company.
@@ -304,6 +357,16 @@ class AmazonSTNEntry(Document):
 			return
 		existing_stock_entry = frappe.db.get_value("Stock Entry", {"amazon_invoice_id": row.invoice_number}, "name")
 		if existing_stock_entry:
+			se = frappe.get_doc("Stock Entry", existing_stock_entry)
+			if se.docstatus != 0:
+				frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1})
+				return
+
+			if not self.add_item_to_stock_entry(se, row):
+				self.add_error_log(row, f"{row.item} is not a stock or bundle item.")
+				return
+			se.amazon_invoice_value = flt(se.amazon_invoice_value) + flt(row.invoice_value)
+			se.save(ignore_permissions=True)
 			frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1})
 			return
 
@@ -318,60 +381,17 @@ class AmazonSTNEntry(Document):
 		se.from_warehouse = row.source_warehouse
 		se.to_warehouse = row.target_warehouse
 
-		is_bundle_item = frappe.db.get_value('Item', row.item, 'is_bundle_item', )
-		is_stock_item = frappe.db.get_value("Item", row.item, "is_stock_item")
-		if not is_stock_item and not is_bundle_item:
-			error_message = f"{row.item} is not a stock Item and not a bundle item."
-			frappe.db.set_value(row.doctype, row.name, {"error_log": error_message,"stock_entry": None,"transactions_created": 0})
+		if not self.add_item_to_stock_entry(se, row):
+			self.add_error_log(row, f"{row.item} is not a stock or bundle item.")
 			return
 
-		if is_stock_item:
-			se.append("items", {
-				"item_code": row.item,
-				"qty": flt(row.qty),
-				"transfer_qty": flt(row.qty),
-				"uom": frappe.db.get_value("Item", row.item, "stock_uom"),
-				"s_warehouse": row.source_warehouse,
-				"t_warehouse": row.target_warehouse,
-				"basic_rate": flt(row.invoice_value) / flt(row.qty) if flt(row.qty) else 0,
-				"conversion_factor": 1,
-				"allow_zero_valuation_rate": 1
-			})
-
-		elif is_bundle_item:
-			se.append("bundle_items", {
-				"item_code": row.item,
-				"qty": flt(row.qty),
-				"transfer_qty": flt(row.qty),
-				"uom": frappe.db.get_value("Item", row.item, "stock_uom"),
-				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
-				"base_rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
-				"amount": flt(row.taxable_value),
-				"base_amount": flt(row.taxable_value),
-				"s_warehouse": row.source_warehouse,
-				"t_warehouse": row.target_warehouse,
-				"conversion_factor": 1,
-				"allow_zero_valuation_rate": 1
-			})
-			add_bundle_components_to_stock_entry(se=se, bundle_item_code=row.item, bundle_qty=row.qty, source_warehouse=row.source_warehouse, target_warehouse=row.target_warehouse)
-
-		# Setting Invoice value, Need to change logic while mutliple items are handling
-		se.amazon_invoice_value = flt(row.invoice_value)
-
+		se.amazon_invoice_value = flt(se.amazon_invoice_value) + flt(row.invoice_value)
 		se.insert(ignore_permissions=True)
 		frappe.db.set_value(row.doctype, row.name, {
 			"stock_entry": se.name,
 			"transactions_created": 1,
 			"error_log": ""
 		})
-		# Submit Stock Entry with error handling
-		frappe.db.savepoint("before_stn_stock_entry_submit")
-		try:
-			se.submit()
-		except Exception as e:
-			frappe.db.rollback(save_point="before_stn_stock_entry_submit")
-			error_message = f"Stock Entry {se.name} created but submission failed: {str(e)}"
-			frappe.db.set_value(row.doctype, row.name, "error_log", error_message)
 
 	def delete_linked_documents(self):
 		"""Delete linked Stock Entries when the STN Entry is deleted."""
@@ -443,6 +463,20 @@ class AmazonSTNEntry(Document):
 			"docstatus": ["!=", 2]  # Exclude cancelled invoices
 		})
 		if existing_invoice:
+			si = frappe.get_doc("Sales Invoice", existing_invoice)
+			if si.docstatus != 0:
+				frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice)
+				return
+
+			si.append("items", {
+				"item_code": row.item,
+				"qty": flt(row.qty),
+				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+				"warehouse": row.source_warehouse,
+				"allow_zero_valuation_rate": 1
+			})
+			si.amazon_invoice_value = flt(si.amazon_invoice_value) + flt(row.invoice_value)
+			si.save(ignore_permissions=True)
 			frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice)
 			return
 
@@ -479,7 +513,6 @@ class AmazonSTNEntry(Document):
 				"warehouse": row.source_warehouse,
 				"allow_zero_valuation_rate": 1
 			})
-
 			if igst_account:
 				si.append("taxes", {
 					"charge_type": "On Net Total",
@@ -489,20 +522,9 @@ class AmazonSTNEntry(Document):
 				})
 
 			# Setting Invoice value, Need to change logic while mutliple items are handling
-			si.amazon_invoice_value = flt(row.invoice_value)
-
+			si.amazon_invoice_value = flt(si.amazon_invoice_value) + flt(row.invoice_value)
 			si.save(ignore_permissions=True)
 			frappe.db.set_value(row.doctype, row.name, "sales_invoice", si.name)
-
-			# Submit Sales Invoice with error handling
-			frappe.db.savepoint("before_stn_sales_invoice_submit")
-			try:
-				si.submit()
-			except Exception as e:
-				frappe.db.rollback(save_point="before_stn_sales_invoice_submit")
-				error_message = f"Sales Invoice {si.name} created but submission failed: {str(e)}"
-				frappe.db.set_value(row.doctype, row.name, "error_log", error_message)
-
 		except Exception as e:
 			self.add_error_log(row, f"Failed to create Sales Invoice: {str(e)}")
 
@@ -519,6 +541,32 @@ class AmazonSTNEntry(Document):
 			"docstatus": ["!=", 2]  # Exclude cancelled invoices
 		})
 		if existing_invoice:
+			pi = frappe.get_doc("Purchase Invoice", existing_invoice)
+			if pi.docstatus != 0:
+				frappe.db.set_value(row.doctype, row.name, "purchase_invoice", existing_invoice)
+				return
+
+			pi.append("items", {
+				"item_code": row.item,
+				"qty": flt(row.qty),
+				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+				"warehouse": row.target_warehouse
+			})
+			if frappe.db.get_value('Item', row.item, 'is_bundle_item'):
+				pi.append("bundle_items", {
+					"item_code": row.item,
+					"qty": flt(row.qty),
+					"stock_qty": flt(row.qty),
+					"uom": frappe.db.get_value('Item', row.item, 'stock_uom'),
+					"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+					"base_rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+					"amount": flt(row.taxable_value),
+					"base_amount": flt(row.taxable_value),
+					"warehouse": row.target_warehouse
+				})
+
+			pi.amazon_invoice_value = flt(pi.amazon_invoice_value) + flt(row.invoice_value)
+			pi.save(ignore_permissions=True)
 			frappe.db.set_value(row.doctype, row.name, "purchase_invoice", existing_invoice)
 			return
 
@@ -557,7 +605,6 @@ class AmazonSTNEntry(Document):
 				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
 				"warehouse": row.target_warehouse
 			})
-
 			#Adding bundle Items to Bundle Items table
 			if frappe.db.get_value('Item', row.item, 'is_bundle_item'):
 				pi.append("bundle_items", {
@@ -581,20 +628,9 @@ class AmazonSTNEntry(Document):
 				})
 
 			# Setting Invoice value, Need to change logic while mutliple items are handling
-			pi.amazon_invoice_value = flt(row.invoice_value)
-
+			pi.amazon_invoice_value = flt(pi.amazon_invoice_value) + flt(row.invoice_value)
 			pi.save(ignore_permissions=True)
 			frappe.db.set_value(row.doctype, row.name, "purchase_invoice", pi.name)
-
-			# Submit Purchase Invoice with error handling
-			frappe.db.savepoint("before_stn_purchase_invoice_submit")
-			try:
-				pi.submit()
-			except Exception as e:
-				frappe.db.rollback(save_point="before_stn_purchase_invoice_submit")
-				error_message = f"Purchase Invoice {pi.name} created but submission failed: {str(e)}"
-				frappe.db.set_value(row.doctype, row.name, "error_log", error_message)
-
 		except Exception as e:
 			exception_msg = f"Failed to create Purchase Invoice: {str(e)}"
 			self.add_error_log(row, exception_msg)
