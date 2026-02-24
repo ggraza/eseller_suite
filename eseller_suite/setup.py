@@ -385,7 +385,6 @@ def get_purchase_invoice_custom_fields():
 				"fieldtype": "Data",
 				"label": "Flipkart Transaction ID",
 				"insert_after": "due_date",
-				"in_standard_filter": 1,
 				"read_only": 1,
 				"no_copy": 1
 			},
@@ -444,6 +443,39 @@ def get_purchase_invoice_custom_fields():
 				"label": "Bundle Items",
 				"insert_after": "items",
 				"options": "Purchase Invoice Item",
+			},
+			{
+				"fieldname": "total_bundle_amount",
+				"fieldtype": "Currency",
+				"label": "Total Bundle Amount",
+				"read_only": 1,
+				"insert_after": "total_qty",
+				"no_copy": 1,
+				"default": 0,
+				"precision": 2,
+				"depends_on": 'eval: doc.bundle_items'
+			},
+			{
+				"fieldname": "total_bundle_amount_actual",
+				"fieldtype": "Currency",
+				"label": "Total Bundle Amount(Actual)",
+				"read_only": 1,
+				"insert_after": "total_bundle_amount",
+				"no_copy": 1,
+				"default": 0,
+				"precision": 2,
+				"depends_on": 'eval: doc.bundle_items'
+			},
+			{
+				"fieldname": "bundle_difference_amount",
+				"fieldtype": "Currency",
+				"label": "Bundle Difference Amount",
+				"read_only": 1,
+				"insert_after": "total",
+				"no_copy": 1,
+				"default": 0,
+				"precision": 2,
+				"depends_on": 'eval: doc.bundle_items'
 			},
 		],
 		"Purchase Invoice Item": [

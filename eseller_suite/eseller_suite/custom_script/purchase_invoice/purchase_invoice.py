@@ -5,7 +5,30 @@ import frappe
 from frappe import _
 from frappe.utils import flt
 
+def validate(doc, method):
+	'''
+		Method which trigger on validate event of Purhcase Invoice
+	'''
+	set_bundle_diff_amount(doc)
+	populate_item_bundle(doc)
+	set_bundle_diff_amount(doc)
+
+def on_submit(doc, method):
+	'''
+		Method which trigger on on_submit event of Purchase Invoice
+	'''
+	if doc.bundle_difference_amount:
+		title = 'Check Difference Amount'
+		msg = 'Cannot submit the invoice due to difference amount of {0} for bundle items'.format(frappe.bold(doc.bundle_difference_amount))
+		frappe.throw(
+			title=title,
+			msg=msg
+		)
+
 def on_cancel(doc, method):
+	'''
+		Method which trigger on on_cancel event of Purchase Invoice
+	'''
 	doc.ignore_linked_doctypes = (
 		"GL Entry",
 		"Stock Ledger Entry",
@@ -62,7 +85,7 @@ def get_bundle_items(bundle_item):
 
 	return bundle_items
 
-def populate_item_bundle(doc, method=None):
+def populate_item_bundle(doc):
 	"""Expand bundle parent items into child items in Purchase Invoice."""
 	bundle_rows = doc.get("bundle_items") or []
 	if not bundle_rows:
@@ -108,3 +131,25 @@ def populate_item_bundle(doc, method=None):
 		doc.append("items", row)
 
 	doc.set_missing_values()
+
+def set_bundle_diff_amount(doc):
+	'''
+		Method to set bundle differences and total
+	'''
+	#Calculating based on Items table
+	total_bundle_amount = 0
+	for row in doc.items:
+		if row.bundle_parent:
+			total_bundle_amount += row.amount
+	doc.total_bundle_amount = round(total_bundle_amount, 2)
+
+	#Calculating based on Bundle Items Table
+	total_bundle_amount_actual = 0
+	for item in doc.bundle_items:
+		if item.rate and item.qty:
+			item.amount = item.rate * item.qty
+		total_bundle_amount_actual += item.amount
+	doc.total_bundle_amount_actual = round(total_bundle_amount_actual, 2)
+
+	# Setting Difference Amount
+	doc.bundle_difference_amount = round((doc.total_bundle_amount_actual - doc.total_bundle_amount), 2)
