@@ -354,6 +354,10 @@ class AmazonSTNEntry(Document):
 				"allow_zero_valuation_rate": 1
 			})
 			add_bundle_components_to_stock_entry(se=se, bundle_item_code=row.item, bundle_qty=row.qty, source_warehouse=row.source_warehouse, target_warehouse=row.target_warehouse)
+
+		# Setting Invoice value, Need to change logic while mutliple items are handling
+		se.amazon_invoice_value = flt(row.invoice_value)
+
 		se.insert(ignore_permissions=True)
 		frappe.db.set_value(row.doctype, row.name, {
 			"stock_entry": se.name,
@@ -484,15 +488,11 @@ class AmazonSTNEntry(Document):
 					"description": f"IGST @ {tax_rate}%"
 				})
 
+			# Setting Invoice value, Need to change logic while mutliple items are handling
+			si.amazon_invoice_value = flt(row.invoice_value)
+
 			si.save(ignore_permissions=True)
 			frappe.db.set_value(row.doctype, row.name, "sales_invoice", si.name)
-
-			# Apply discount if invoice value is provided and does not match outstanding amount
-			invoice_value = flt(row.invoice_value)
-			if invoice_value and si.outstanding_amount != invoice_value:
-				si.discount_amount = si.outstanding_amount - invoice_value
-				si.save(ignore_permissions=True)
-				si.reload()  # Reload to get updated outstanding_amount after discount
 
 			# Submit Sales Invoice with error handling
 			frappe.db.savepoint("before_stn_sales_invoice_submit")
@@ -580,15 +580,11 @@ class AmazonSTNEntry(Document):
 					"description": f"IGST @ {tax_rate}%"
 				})
 
+			# Setting Invoice value, Need to change logic while mutliple items are handling
+			pi.amazon_invoice_value = flt(row.invoice_value)
+
 			pi.save(ignore_permissions=True)
 			frappe.db.set_value(row.doctype, row.name, "purchase_invoice", pi.name)
-
-			# Apply discount if invoice value is provided and does not match outstanding amount
-			invoice_value = flt(row.invoice_value)
-			if invoice_value and pi.rounded_total != invoice_value:
-				pi.discount_amount = pi.rounded_total - invoice_value
-				pi.save(ignore_permissions=True)
-				pi.reload()  # Reload to get updated outstanding_amount after discount
 
 			# Submit Purchase Invoice with error handling
 			frappe.db.savepoint("before_stn_purchase_invoice_submit")
