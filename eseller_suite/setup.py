@@ -291,9 +291,18 @@ def get_sales_invoice_custom_fields():
 				"fieldtype": "Data",
 				"label": "Amazon Invoice ID",
 				"insert_after": "company",
+				"in_standard_filter": 1,
 				"read_only": 1,
 				"no_copy": 1,
-			}
+			},
+			{
+				"fieldname": "amazon_invoice_value",
+				"fieldtype": "Currency",
+				"label": "Amazon Invoice Value",
+				"read_only": 1,
+				"insert_after": "amazon_invoice_id",
+				"no_copy": 1
+			},
 		],
 		"Sales Invoice Item": [
 			{
@@ -417,8 +426,17 @@ def get_purchase_invoice_custom_fields():
 				"fieldtype": "Data",
 				"label": "Amazon Invoice ID",
 				"insert_after": "company",
+				"in_standard_filter": 1,
 				"read_only": 1,
 				"no_copy": 1,
+			},
+			{
+				"fieldname": "amazon_invoice_value",
+				"fieldtype": "Currency",
+				"label": "Amazon Invoice Value",
+				"read_only": 1,
+				"insert_after": "amazon_invoice_id",
+				"no_copy": 1
 			},
 			{
 				"fieldname": "bundle_items",
@@ -494,6 +512,13 @@ def get_purchase_invoice_custom_fields():
 				"label": "Bundle Parent",
 				"read_only": 1,
 				"insert_after": "item_name",
+			},
+			{
+				"fieldname": "bundle_processed",
+				"fieldtype": "Check",
+				"label": "Bundle Processed",
+				"hidden": 1,
+				"insert_after": "bundle_parent",
 			},
 		]
 	}
@@ -584,8 +609,17 @@ def get_stock_entry_custom_fields():
 				"fieldname": "amazon_invoice_id",
 				"fieldtype": "Data",
 				"label": "Amazon Invoice ID",
+				"in_standard_filter": 1,
 				"read_only": 1,
 				"insert_after": "ewaybill",
+				"no_copy": 1
+			},
+			{
+				"fieldname": "amazon_invoice_value",
+				"fieldtype": "Currency",
+				"label": "Amazon Invoice Value",
+				"read_only": 1,
+				"insert_after": "amazon_invoice_id",
 				"no_copy": 1
 			},
 			{

@@ -76,16 +76,14 @@ def populate_item_bundle(doc, method=None):
 	]
 
 	for bundle in bundle_rows:
+		if bundle.bundle_processed:
+			continue
 		children = get_bundle_items(bundle.item_code) or []
 		for child in children:
-
 			qty = flt(child.get("qty")) * flt(bundle.qty)
-			rate = flt(child.get("rate"))
-
+			rate = flt(bundle.get("rate")) / flt(child.get("qty"))
 			conversion_factor = 1
 			stock_uom = child["uom"]
-			stock_qty = qty
-
 			populated_items.append({
 				"item_code": child["item_code"],
 				"item_name": child["item_name"],
@@ -93,7 +91,6 @@ def populate_item_bundle(doc, method=None):
 				"uom": child["uom"],
 				"stock_uom": stock_uom,
 				"conversion_factor": conversion_factor,
-				# "stock_qty": stock_qty,
 				"rate": rate,
 				"amount": qty * rate,
 				"base_rate": rate,
@@ -105,6 +102,7 @@ def populate_item_bundle(doc, method=None):
 				"item_tax_rate": '{}',
 				"taxable_value": qty * rate
 			})
+		bundle.bundle_processed = 1
 
 	for row in populated_items:
 		doc.append("items", row)
