@@ -1,10 +1,9 @@
 # Copyright (c) 2026, efeone and contributors
 # For license information, please see license.txt
-
-from frappe.core.doctype.submission_queue.submission_queue import queue_submission
 import frappe
-from frappe.model.document import Document
 from frappe.utils import get_datetime, flt
+from frappe.model.document import Document
+from frappe.core.doctype.submission_queue.submission_queue import queue_submission
 
 import os
 import csv
@@ -223,11 +222,11 @@ class AmazonSTNEntry(Document):
 				#Update HSN code in Item master if missing
 				item_hsn, allow_purchase = frappe.db.get_value("Item", item, ["gst_hsn_code", "is_purchase_item"])
 				if not item_hsn and row.hsn_code:
-					frappe.db.set_value("Item", item, "gst_hsn_code", row.hsn_code)
+					frappe.db.set_value("Item", item, "gst_hsn_code", row.hsn_code, update_modified=False)
 
 				# If item is not marked as purchase item and it's an inter-company transfer, mark it as purchase item
 				if row.source_company != row.target_company and not allow_purchase:
-					frappe.db.set_value('Item', item, 'is_purchase_item', 1)
+					frappe.db.set_value('Item', item, 'is_purchase_item', 1, update_modified=False)
 			else:
 				self.add_error_log(row, f"Item not found for ASIN: {row.asin}")
 
@@ -298,10 +297,10 @@ class AmazonSTNEntry(Document):
 
 	def add_item_to_stock_entry(self, se, row):
 		"""
-		Common method to add stock item or bundle item to Stock Entry.
-		Returns True if item added successfully, else False.
+			Common method to add stock item or bundle item to Stock Entry.
+			Returns True if item added successfully, else False.
 		"""
-		item_details = frappe.db.get_value("Item",row.item,["is_stock_item", "is_bundle_item", "stock_uom"],as_dict=True)
+		item_details = frappe.db.get_value("Item", row.item, ["is_stock_item", "is_bundle_item", "stock_uom"], as_dict=True)
 
 		if not item_details:
 			return False
@@ -311,7 +310,7 @@ class AmazonSTNEntry(Document):
 		stock_uom = item_details.stock_uom
 		if not is_stock_item and not is_bundle_item:
 			error_message = f"{row.item} is not a stock Item and not a bundle item."
-			frappe.db.set_value(row.doctype,row.name,{"error_log": error_message,"stock_entry": None,"transactions_created": 0})
+			frappe.db.set_value(row.doctype,row.name,{"error_log": error_message,"stock_entry": None,"transactions_created": 0}, update_modified=False)
 			return False
 
 		stock_uom = item_details.stock_uom
@@ -331,7 +330,8 @@ class AmazonSTNEntry(Document):
 				"t_warehouse": row.target_warehouse,
 				"basic_rate": basic_rate,
 				"conversion_factor": 1,
-				"allow_zero_valuation_rate": 1
+				"allow_zero_valuation_rate": 1,
+				"set_basic_rate_manually": 1
 			})
 
 		elif is_bundle_item:
@@ -346,7 +346,8 @@ class AmazonSTNEntry(Document):
 				"s_warehouse": row.source_warehouse,
 				"t_warehouse": row.target_warehouse,
 				"conversion_factor": 1,
-				"allow_zero_valuation_rate": 1
+				"allow_zero_valuation_rate": 1,
+				"set_basic_rate_manually": 1
 			})
 
 			add_bundle_components_to_stock_entry(se=se, bundle_item_code=row.item, bundle_qty=qty, bundle_rate=basic_rate ,source_warehouse=row.source_warehouse, target_warehouse=row.target_warehouse)
@@ -362,7 +363,7 @@ class AmazonSTNEntry(Document):
 		if existing_stock_entry:
 			se = frappe.get_doc("Stock Entry", existing_stock_entry)
 			if se.docstatus == 1:
-				frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1})
+				frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1}, update_modified=False)
 				return
 
 			if not self.add_item_to_stock_entry(se, row):
@@ -370,7 +371,7 @@ class AmazonSTNEntry(Document):
 				return
 			se.amazon_invoice_value = flt(se.amazon_invoice_value) + flt(row.invoice_value)
 			se.save(ignore_permissions=True)
-			frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1})
+			frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1}, update_modified=False)
 			return
 
 		# Create Stock Entry
@@ -394,7 +395,7 @@ class AmazonSTNEntry(Document):
 			"stock_entry": se.name,
 			"transactions_created": 1,
 			"error_log": ""
-		})
+		}, update_modified=False)
 
 	def delete_linked_documents(self):
 		"""Delete linked Stock Entries when the STN Entry is deleted."""
@@ -483,7 +484,7 @@ class AmazonSTNEntry(Document):
 			try:
 				si = frappe.get_doc("Sales Invoice", existing_invoice)
 				if si.docstatus == 1:
-					frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice)
+					frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice, update_modified=False)
 					return
 
 				si.append("items", {
@@ -496,13 +497,13 @@ class AmazonSTNEntry(Document):
 				})
 				si.amazon_invoice_value = flt(si.amazon_invoice_value) + flt(row.invoice_value)
 				si.save(ignore_permissions=True)
-				frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice)
+				frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice, update_modified=False)
 				return
 			except Exception as e:
 				exception_msg = f"Failed to create Sales Invoice: {str(e)}"
 				if row.error_log:
 					exception_msg = f"{row.error_log}\n{exception_msg}"
-				frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg)
+				frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg, update_modified=False)
 				self.add_error_log(row, exception_msg)
 				return
 
@@ -546,13 +547,13 @@ class AmazonSTNEntry(Document):
 			# Setting Invoice value, Need to change logic while mutliple items are handling
 			si.amazon_invoice_value = flt(si.amazon_invoice_value) + flt(row.invoice_value)
 			si.save(ignore_permissions=True)
-			frappe.db.set_value(row.doctype, row.name, "sales_invoice", si.name)
+			frappe.db.set_value(row.doctype, row.name, "sales_invoice", si.name, update_modified=False)
 			return
 		except Exception as e:
 			exception_msg = f"Failed to create Sales Invoice: {str(e)}"
 			if row.error_log:
 				exception_msg = f"{row.error_log}\n{exception_msg}"
-			frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg)
+			frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg, update_modified=False)
 			self.add_error_log(row, exception_msg)
 
 	def create_purchase_invoice(self, row):
@@ -586,7 +587,7 @@ class AmazonSTNEntry(Document):
 			try:
 				pi = frappe.get_doc("Purchase Invoice", existing_invoice)
 				if pi.docstatus == 1:
-					frappe.db.set_value(row.doctype, row.name, "purchase_invoice", existing_invoice)
+					frappe.db.set_value(row.doctype, row.name, "purchase_invoice", existing_invoice, update_modified=False)
 					return
 
 				# Handling Bundle Items
@@ -621,13 +622,13 @@ class AmazonSTNEntry(Document):
 				pi.amazon_invoice_value = flt(pi.amazon_invoice_value) + flt(row.invoice_value)
 				pi.set_missing_values()
 				pi.save(ignore_permissions=True)
-				frappe.db.set_value(row.doctype, row.name, "purchase_invoice", existing_invoice)
+				frappe.db.set_value(row.doctype, row.name, "purchase_invoice", existing_invoice, update_modified=False)
 				return
 			except Exception as e:
 				exception_msg = f"Failed to update Purchase Invoice: {existing_invoice} - {str(e)}"
 				if row.error_log:
 					exception_msg = f"{row.error_log}\n{exception_msg}"
-				frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg)
+				frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg, update_modified=False)
 				self.add_error_log(row, exception_msg)
 				return
 
@@ -692,12 +693,12 @@ class AmazonSTNEntry(Document):
 			pi.amazon_invoice_value = flt(pi.amazon_invoice_value) + flt(row.invoice_value)
 			pi.set_missing_values()
 			pi.save(ignore_permissions=True)
-			frappe.db.set_value(row.doctype, row.name, "purchase_invoice", pi.name)
+			frappe.db.set_value(row.doctype, row.name, "purchase_invoice", pi.name, update_modified=False)
 		except Exception as e:
 			exception_msg = f"Failed to create Purchase Invoice: {str(e)}"
 			if row.error_log:
 				exception_msg = f"{row.error_log}\n{exception_msg}"
-			frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg)
+			frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg, update_modified=False)
 			self.add_error_log(row, exception_msg)
 
 	def handle_stock_movement_entries(self):
@@ -722,7 +723,8 @@ class AmazonSTNEntry(Document):
 				# For Inter-Company Transfers, create Sales and Purchase Invoices
 				self.create_sales_invoice(stn_row)
 				self.create_purchase_invoice(stn_row)
-				frappe.db.set_value(stn_row.doctype, stn_row.name, "transactions_created", 1)
+				frappe.db.set_value(stn_row.doctype, stn_row.name, "transactions_created", 1, update_modified=False)
+		submit_transactions(self.name)
 
 	@frappe.whitelist()
 	def retry_fetching_data(self):
@@ -776,3 +778,57 @@ def get_items_from_bundle(bundle):
 			"item_tax_template": bundle.get('item_tax_template')
 		})
 	return populated_items
+
+def submit_transactions(stn_entry_name):
+		'''
+			Method to submit created Sales, Purchase and Stock entries...
+		'''
+		if not frappe.db.exists('Amazon STN Entry', stn_entry_name):
+			return
+
+		self = frappe.get_doc('Amazon STN Entry', stn_entry_name)
+		for stn_row in self.stn_entries:
+			if stn_row.transactions_created:
+				# Submiting Stock Entry with exception handling
+				if stn_row.stock_entry:
+					frappe.db.savepoint("before_se_submit")
+					try:
+						se_doc = frappe.get_doc('Stock Entry', stn_row.stock_entry)
+						se_doc.save(ignore_permissions=True)
+						se_doc.submit()
+					except Exception as e:
+						frappe.db.rollback(save_point="before_se_submit")
+						exception_msg = f"Failed to submit Stock Entry: {stn_row.stock_entry} - {str(e)}"
+						if stn_row.error_log:
+							exception_msg = f"{stn_row.error_log}\n{exception_msg}"
+						frappe.db.set_value(stn_row.doctype, stn_row.name, "error_log", exception_msg, update_modified=False)
+
+				# Submiting Sales Invoice with exception handling
+				if stn_row.sales_invoice:
+					frappe.db.savepoint("before_si_submit")
+					try:
+						si_doc = frappe.get_doc('Sales Invoice', stn_row.sales_invoice)
+						si_doc.discount_amount = 0 #To trigger discount calculation
+						si_doc.save(ignore_permissions=True)
+						si_doc.submit()
+					except Exception as e:
+						frappe.db.rollback(save_point="before_si_submit")
+						exception_msg = f"Failed to submit Sales Invoice: {stn_row.sales_invoice} - {str(e)}"
+						if stn_row.error_log:
+							exception_msg = f"{stn_row.error_log}\n{exception_msg}"
+						frappe.db.set_value(stn_row.doctype, stn_row.name, "error_log", exception_msg, update_modified=False)
+
+				# Submiting Purchase Invoice with exception handling
+				if stn_row.purchase_invoice:
+					frappe.db.savepoint("before_pi_submit")
+					try:
+						pi_doc = frappe.get_doc('Purchase Invoice', stn_row.purchase_invoice)
+						pi_doc.discount_amount = 0 #To trigger discount calculation
+						pi_doc.save(ignore_permissions=True)
+						pi_doc.submit()
+					except Exception as e:
+						frappe.db.rollback(save_point="before_pi_submit")
+						exception_msg = f"Failed to submit Purchase Invoice: {stn_row.purchase_invoice} - {str(e)}"
+						if stn_row.error_log:
+							exception_msg = f"{stn_row.error_log}\n{exception_msg}"
+						frappe.db.set_value(stn_row.doctype, stn_row.name, "error_log", exception_msg, update_modified=False)

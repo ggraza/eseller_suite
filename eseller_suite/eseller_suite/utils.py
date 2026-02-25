@@ -51,7 +51,8 @@ def add_bundle_components_to_stock_entry(se, bundle_item_code, bundle_qty, bundl
 			"conversion_factor": 1,
 			"s_warehouse": source_warehouse,
 			"t_warehouse": target_warehouse,
-			"allow_zero_valuation_rate": 1
+			"allow_zero_valuation_rate": 1,
+			"set_basic_rate_manually": 1
 		})
 
 @frappe.whitelist()
