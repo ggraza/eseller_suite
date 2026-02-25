@@ -14,13 +14,13 @@ frappe.ui.form.on("Purchase Invoice", {
 });
 
 frappe.ui.form.on('Purchase Invoice Item', {
-	item_code: function(frm, cdt, cdn) {
+	item_code: function (frm, cdt, cdn) {
 		apply_bundle_items(frm, cdt, cdn);
 	},
-	qty: function(frm, cdt, cdn) {
+	qty: function (frm, cdt, cdn) {
 		apply_bundle_items(frm, cdt, cdn);
 	},
-	bundle_items_remove: function(frm, cdt, cdn) {
+	bundle_items_remove: function (frm, cdt, cdn) {
 		let deleted_row_name = cdn;
 		(frm.doc.items || []).forEach(d => {
 			if (d.bundle_parent === deleted_row_name) {
@@ -40,11 +40,11 @@ function apply_bundle_items(frm, cdt, cdn) {
 	if (!row.item_code) return;
 
 	frappe.call({
-		method: "eseller_suite.eseller_suite.custom_script.purchase_invoice.purchase_invoice.get_bundle_items",
+		method: "eseller_suite.eseller_suite.utils.get_bundle_items",
 		args: {
 			bundle_item: row.item_code
 		},
-		callback: function(r) {
+		callback: function (r) {
 			if (!r.message) return;
 
 			let selected_qty = flt(row.qty) || 1;
@@ -61,7 +61,7 @@ function apply_bundle_items(frm, cdt, cdn) {
 				}
 			});
 
-			r.message.forEach(function(bundle_child) {
+			r.message.forEach(function (bundle_child) {
 				let new_row = frm.add_child("items");
 				new_row.item_code = bundle_child.item_code;
 				new_row.item_name = bundle_child.item_name;
@@ -71,8 +71,8 @@ function apply_bundle_items(frm, cdt, cdn) {
 				new_row.description = bundle_child.description;
 				new_row.bundle_parent = row.name;
 				new_row.bundle_qty = bundle_child.qty;
+				new_row.from_bundle_item = 1;
 			});
-
 			frm.refresh_field("items");
 		}
 	});
