@@ -1,6 +1,12 @@
 import frappe
 from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository import create_stock_entry
 
+def before_validate(doc, method):
+	'''
+		Method which trigger on before_validate event of Sales Invoice
+	'''
+	set_discount_based_on_amazon_value(doc)
+
 def validate(doc, method):
 	if not doc.is_return and doc.update_stock:
 		for item in doc.items:
@@ -55,3 +61,14 @@ def get_serial_nos(warehouse, item_code, qty):
 	if len(serial_no_list) < qty:
 		frappe.throw(f"Not enough serial numbers available for item {item_code}.")
 	return [serial_no.name for serial_no in serial_no_list]
+
+def set_discount_based_on_amazon_value(doc):
+	'''
+		Method to set dicount based on Amazon value and outstanding amount
+	'''
+	if doc.amazon_invoice_value and doc.outstanding_amount:
+		diff = doc.outstanding_amount - doc.amazon_invoice_value
+		# Add discount if difference is between -1 to 1, else it may be some error
+		if diff and (1 > diff > -1):
+			doc.apply_discount_on = 'Grand Total'
+			doc.discount_amount = diff

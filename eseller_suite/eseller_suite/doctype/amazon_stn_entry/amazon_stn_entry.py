@@ -465,28 +465,6 @@ class AmazonSTNEntry(Document):
 			"company": row.source_company,
 			"docstatus": ["!=", 2]  # Exclude cancelled invoices
 		})
-		if existing_invoice:
-			si = frappe.get_doc("Sales Invoice", existing_invoice)
-			if si.docstatus != 0:
-				frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice)
-				return
-
-			si.append("items", {
-				"item_code": row.item,
-				"qty": flt(row.qty),
-				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
-				"warehouse": row.source_warehouse,
-				"allow_zero_valuation_rate": 1
-			})
-			si.amazon_invoice_value = flt(si.amazon_invoice_value) + flt(row.invoice_value)
-			si.save(ignore_permissions=True)
-			frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice)
-			return
-
-		customer = frappe.db.get_value("Customer", {"represents_company": row.target_company, "is_internal_customer": 1})
-		if not customer:
-			self.add_error_log(row, f"Internal Customer for Company {row.target_company} not found.")
-			return
 
 		tax_rate = flt(row.igst_rate)*100
 		igst_account = frappe.db.get_value("GST Account", {
@@ -495,6 +473,43 @@ class AmazonSTNEntry(Document):
 			"parent": "GST Settings",
 			"parentfield": "gst_accounts"
 		}, "igst_account")
+		item_tax_template = frappe.db.get_value("Item Tax Template",{
+			"company": row.source_company,
+			"gst_rate": tax_rate,
+			"disabled":0
+		}) or ""
+
+		if existing_invoice:
+			try:
+				si = frappe.get_doc("Sales Invoice", existing_invoice)
+				if si.docstatus == 1:
+					frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice)
+					return
+
+				si.append("items", {
+					"item_code": row.item,
+					"qty": flt(row.qty),
+					"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
+					"warehouse": row.source_warehouse,
+					"allow_zero_valuation_rate": 1,
+					"item_tax_template": item_tax_template
+				})
+				si.amazon_invoice_value = flt(si.amazon_invoice_value) + flt(row.invoice_value)
+				si.save(ignore_permissions=True)
+				frappe.db.set_value(row.doctype, row.name, "sales_invoice", existing_invoice)
+				return
+			except Exception as e:
+				exception_msg = f"Failed to create Sales Invoice: {str(e)}"
+				if row.error_log:
+					exception_msg = f"{row.error_log}\n{exception_msg}"
+				frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg)
+				self.add_error_log(row, exception_msg)
+				return
+
+		customer = frappe.db.get_value("Customer", {"represents_company": row.target_company, "is_internal_customer": 1})
+		if not customer:
+			self.add_error_log(row, f"Internal Customer for Company {row.target_company} not found.")
+			return
 
 		try:
 			#Create Sales Invoice
@@ -514,9 +529,13 @@ class AmazonSTNEntry(Document):
 				"qty": flt(row.qty),
 				"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
 				"warehouse": row.source_warehouse,
-				"allow_zero_valuation_rate": 1
+				"allow_zero_valuation_rate": 1,
+				"item_tax_template": item_tax_template
 			})
+
 			if igst_account:
+				# Clear inital values, if any
+				si.taxes = []
 				si.append("taxes", {
 					"charge_type": "On Net Total",
 					"account_head": igst_account,
@@ -528,8 +547,13 @@ class AmazonSTNEntry(Document):
 			si.amazon_invoice_value = flt(si.amazon_invoice_value) + flt(row.invoice_value)
 			si.save(ignore_permissions=True)
 			frappe.db.set_value(row.doctype, row.name, "sales_invoice", si.name)
+			return
 		except Exception as e:
-			self.add_error_log(row, f"Failed to create Sales Invoice: {str(e)}")
+			exception_msg = f"Failed to create Sales Invoice: {str(e)}"
+			if row.error_log:
+				exception_msg = f"{row.error_log}\n{exception_msg}"
+			frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg)
+			self.add_error_log(row, exception_msg)
 
 	def create_purchase_invoice(self, row):
 		"""
@@ -543,8 +567,23 @@ class AmazonSTNEntry(Document):
 			"company": row.target_company,
 			"docstatus": ["!=", 2]  # Exclude cancelled invoices
 		})
-		try:
-			if existing_invoice:
+
+		tax_rate = flt(row.igst_rate)*100
+		igst_account = frappe.db.get_value("GST Account", {
+			"company": row.target_company,
+			"account_type": "Input",
+			"parent": "GST Settings",
+			"parentfield": "gst_accounts"
+		}, "igst_account")
+
+		item_tax_template = frappe.db.get_value("Item Tax Template",{
+			"company": row.target_company,
+			"gst_rate": tax_rate,
+			"disabled":0
+		}) or ""
+
+		if existing_invoice:
+			try:
 				pi = frappe.get_doc("Purchase Invoice", existing_invoice)
 				if pi.docstatus == 1:
 					frappe.db.set_value(row.doctype, row.name, "purchase_invoice", existing_invoice)
@@ -561,7 +600,8 @@ class AmazonSTNEntry(Document):
 						"base_rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
 						"amount": flt(row.taxable_value),
 						"base_amount": flt(row.taxable_value),
-						"warehouse": row.target_warehouse
+						"warehouse": row.target_warehouse,
+						"item_tax_template": item_tax_template
 					}
 					pi.append("bundle_items", bundle)
 					bundle_row = pi.bundle_items[-1]
@@ -574,7 +614,8 @@ class AmazonSTNEntry(Document):
 						"item_code": row.item,
 						"qty": flt(row.qty),
 						"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
-						"warehouse": row.target_warehouse
+						"warehouse": row.target_warehouse,
+						"item_tax_template": item_tax_template
 					})
 
 				pi.amazon_invoice_value = flt(pi.amazon_invoice_value) + flt(row.invoice_value)
@@ -582,11 +623,13 @@ class AmazonSTNEntry(Document):
 				pi.save(ignore_permissions=True)
 				frappe.db.set_value(row.doctype, row.name, "purchase_invoice", existing_invoice)
 				return
-		except Exception as e:
-			exception_msg = f"Failed to update Purchase Invoice: {existing_invoice} - {str(e)}"
-			frappe.db.set_value(row.doctype, row.name, "error_log", row.error_log + '\n' + exception_msg)
-			self.add_error_log(row, exception_msg)
-			return
+			except Exception as e:
+				exception_msg = f"Failed to update Purchase Invoice: {existing_invoice} - {str(e)}"
+				if row.error_log:
+					exception_msg = f"{row.error_log}\n{exception_msg}"
+				frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg)
+				self.add_error_log(row, exception_msg)
+				return
 
 		supplier = frappe.db.get_value("Supplier", {"represents_company": row.source_company, "is_internal_supplier": 1})
 
@@ -618,7 +661,8 @@ class AmazonSTNEntry(Document):
 					"base_rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
 					"amount": flt(row.taxable_value),
 					"base_amount": flt(row.taxable_value),
-					"warehouse": row.target_warehouse
+					"warehouse": row.target_warehouse,
+					"item_tax_template": item_tax_template
 				}
 				pi.append("bundle_items", bundle)
 				populated_items = get_items_from_bundle(bundle)
@@ -630,8 +674,19 @@ class AmazonSTNEntry(Document):
 					"item_code": row.item,
 					"qty": flt(row.qty),
 					"rate": flt(row.taxable_value) / flt(row.qty) if flt(row.qty) else 0,
-					"warehouse": row.target_warehouse
+					"warehouse": row.target_warehouse,
+					"item_tax_template": item_tax_template
 				})
+
+			if igst_account:
+				#Clear table initially
+				pi.taxes = []
+				pi.append("taxes", {
+						"charge_type": "On Net Total",
+						"account_head": igst_account,
+						"rate": tax_rate,
+						"description": f"IGST @ {tax_rate}%"
+					})
 
 			# Setting Invoice value, Need to change logic while mutliple items are handling
 			pi.amazon_invoice_value = flt(pi.amazon_invoice_value) + flt(row.invoice_value)
@@ -640,7 +695,9 @@ class AmazonSTNEntry(Document):
 			frappe.db.set_value(row.doctype, row.name, "purchase_invoice", pi.name)
 		except Exception as e:
 			exception_msg = f"Failed to create Purchase Invoice: {str(e)}"
-			frappe.db.set_value(row.doctype, row.name, "error_log", row.error_log + '\n' + exception_msg)
+			if row.error_log:
+				exception_msg = f"{row.error_log}\n{exception_msg}"
+			frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg)
 			self.add_error_log(row, exception_msg)
 
 	def handle_stock_movement_entries(self):
@@ -715,6 +772,7 @@ def get_items_from_bundle(bundle):
 			"bundle_qty": flt(child.get("qty")),
 			"item_tax_rate": '{}',
 			"taxable_value": qty * rate,
-			"from_bundle_item": 1
+			"from_bundle_item": 1,
+			"item_tax_template": bundle.get('item_tax_template')
 		})
 	return populated_items
