@@ -3,11 +3,12 @@
 
 import frappe
 
-def validate(doc, method):
+def before_validate(doc, method):
 	'''
-		Method which trigger on validate event of Purhcase Invoice
+		Method which trigger on before_validate event of Purhcase Invoice
 	'''
 	set_bundle_diff_amount(doc)
+	set_discount_based_on_amazon_value(doc)
 
 def before_submit(doc, method):
 	doc.custom_ready_to_submit = 1
@@ -65,3 +66,14 @@ def set_bundle_diff_amount(doc):
 
 	# Setting Difference Amount
 	doc.bundle_difference_amount = round((doc.total_bundle_amount_actual - doc.total_bundle_amount), 2)
+
+def set_discount_based_on_amazon_value(doc):
+	'''
+		Method to set dicount based on Amazon value and outstanding amount
+	'''
+	if doc.amazon_invoice_value and doc.outstanding_amount:
+		diff = doc.outstanding_amount - doc.amazon_invoice_value
+		# Add discount if difference is between -1 to 1, else it may be some error
+		if diff and (1 > diff > -1):
+			doc.apply_discount_on = 'Grand Total'
+			doc.discount_amount = diff

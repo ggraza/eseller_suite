@@ -131,6 +131,7 @@ override_doctype_class = {
 
 doc_events = {
 	'Sales Invoice':{
+		"before_validate": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.before_validate",
 		"validate": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.validate",
 		"before_submit": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.before_submit",
 		"on_cancel": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.on_cancel",
@@ -149,7 +150,7 @@ doc_events = {
 	'Purchase Invoice':{
 		"on_cancel": "eseller_suite.eseller_suite.custom_script.purchase_invoice.purchase_invoice.on_cancel",
 		"on_submit": "eseller_suite.eseller_suite.custom_script.purchase_invoice.purchase_invoice.on_submit",
-		"validate": "eseller_suite.eseller_suite.custom_script.purchase_invoice.purchase_invoice.validate",
+		"before_validate": "eseller_suite.eseller_suite.custom_script.purchase_invoice.purchase_invoice.before_validate",
 	},
 	'Product Bundle':{
         "after_insert": "eseller_suite.eseller_suite.custom_script.product_bundle.product_bundle.mark_item_as_bundle",
