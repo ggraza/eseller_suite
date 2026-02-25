@@ -546,11 +546,11 @@ def get_purchase_invoice_custom_fields():
 				"insert_after": "item_name",
 			},
 			{
-				"fieldname": "bundle_processed",
+				"fieldname": "from_bundle_item",
 				"fieldtype": "Check",
-				"label": "Bundle Processed",
+				"label": "From Bundle Item",
 				"hidden": 1,
-				"insert_after": "bundle_parent",
+				"insert_after": "bundle_parent"
 			},
 		]
 	}
