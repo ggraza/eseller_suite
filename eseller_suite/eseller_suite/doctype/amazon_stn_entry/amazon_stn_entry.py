@@ -309,14 +309,18 @@ class AmazonSTNEntry(Document):
 		is_stock_item = item_details.is_stock_item
 		is_bundle_item = item_details.is_bundle_item
 		stock_uom = item_details.stock_uom
+		if not is_stock_item and not is_bundle_item:
+			error_message = f"{row.item} is not a stock Item and not a bundle item."
+			frappe.db.set_value(row.doctype,row.name,{"error_log": error_message,"stock_entry": None,"transactions_created": 0})
+			return False
 
+		stock_uom = item_details.stock_uom
 		if not is_stock_item and not is_bundle_item:
 			return False
 
 		qty = flt(row.qty)
-		basic_rate = flt(row.invoice_value) / qty if qty else 0
-		tax_rate = flt(row.taxable_value) / qty if qty else 0
-
+		invoice_value = flt(row.invoice_value)
+		basic_rate = invoice_value / qty if qty else 0
 		if is_stock_item:
 			se.append("items", {
 				"item_code": row.item,
@@ -336,10 +340,9 @@ class AmazonSTNEntry(Document):
 				"qty": qty,
 				"transfer_qty": qty,
 				"uom": stock_uom,
-				"rate": tax_rate,
-				"base_rate": tax_rate,
-				"amount": flt(row.taxable_value),
-				"base_amount": flt(row.taxable_value),
+				"basic_rate": basic_rate,
+				"amount": invoice_value,
+				"base_amount": invoice_value,
 				"s_warehouse": row.source_warehouse,
 				"t_warehouse": row.target_warehouse,
 				"conversion_factor": 1,
@@ -355,10 +358,10 @@ class AmazonSTNEntry(Document):
 		"""
 		if row.source_company != row.target_company:
 			return
-		existing_stock_entry = frappe.db.get_value("Stock Entry", {"amazon_invoice_id": row.invoice_number}, "name")
+		existing_stock_entry = frappe.db.get_value("Stock Entry", {"amazon_invoice_id": row.invoice_number, "docstatus": ["!=", 2]}, "name")
 		if existing_stock_entry:
 			se = frappe.get_doc("Stock Entry", existing_stock_entry)
-			if se.docstatus != 0:
+			if se.docstatus == 1:
 				frappe.db.set_value(row.doctype, row.name, {"stock_entry": existing_stock_entry, "transactions_created": 1})
 				return
 
@@ -542,7 +545,7 @@ class AmazonSTNEntry(Document):
 		})
 		if existing_invoice:
 			pi = frappe.get_doc("Purchase Invoice", existing_invoice)
-			if pi.docstatus != 0:
+			if pi.docstatus == 1:
 				frappe.db.set_value(row.doctype, row.name, "purchase_invoice", existing_invoice)
 				return
 
