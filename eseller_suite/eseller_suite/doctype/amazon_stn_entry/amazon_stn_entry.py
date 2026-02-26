@@ -118,8 +118,9 @@ class AmazonSTNEntry(Document):
 
 	def map_companies_and_warehouses(self, row):
 		"""Map companies and warehouses for the STN row."""
+		allowed_transaction_types = ['FC_TRANSFER', 'FC_REMOVAL']
 		# ToDo :: Except FC_TRANSFER
-		if row.transaction_type != 'FC_TRANSFER':
+		if row.transaction_type not in allowed_transaction_types:
 			self.add_error_log(row, f"Transaction Type with {row.transaction_type} is not handled right now.")
 			row.ready_to_process = 0
 			return
@@ -138,6 +139,16 @@ class AmazonSTNEntry(Document):
 				self.add_error_log(row,f"Source Warehouse not found for code: {row.source_fc} and company: {row.source_company}")
 		else:
 			self.add_error_log(row, f"Source Company not found for GSTIN: {row.source_gstin}")
+
+		if row.transaction_type == 'FC_REMOVAL':
+			main_warehouse = frappe.db.get_single_value("eSeller Settings", "main_warehouse")
+			main_company = frappe.db.get_single_value("eSeller Settings", "main_company")
+			if not main_warehouse or not main_company:
+				self.add_error_log(row, f"Main Warehouse or Main Company is not configured in eSeller Settings, It is required to process FC_REMOVAL.")
+				return
+			row.target_company = main_company
+			row.target_warehouse = main_warehouse
+			return
 
 		# Set target company and warehouse
 		row.target_company = self.get_company_from_gstin(row.target_gstin)
