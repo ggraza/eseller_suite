@@ -2,6 +2,18 @@ import frappe
 from frappe.model import _
 from frappe.model.base_document import flt
 
+def validate(doc, method):
+	'''
+		Method which trigger on validate event of Stock Entry
+	'''
+	set_bundle_diff_amount(doc)
+
+def on_submit(doc, method):
+	'''
+		Method which trigger on on_submit event of Stock Entry
+	'''
+	validate_bundle_amount_difference(doc)
+
 def transfer_barcodes(doc, method=None):
 	"""method transfers the barcodes on submit
 
@@ -55,6 +67,37 @@ def on_canel(doc, method):
 		"Serial and Batch Bundle",
 		"Amazon STN Entry",
 	)
+
+def set_bundle_diff_amount(doc):
+	'''
+		Method to set bundle differences and total
+	'''
+	#Calculating based on Items table
+	total_bundle_amount = 0
+	for row in doc.items:
+		if row.from_bundle_item:
+			total_bundle_amount += row.amount
+	doc.total_bundle_amount = round(total_bundle_amount, 2)
+
+	#Calculating based on Bundle Items Table
+	total_bundle_amount_actual = 0
+	for item in doc.bundle_items:
+		if item.basic_rate and item.qty:
+			item.amount = item.basic_rate * item.qty
+		total_bundle_amount_actual += item.amount
+	doc.total_bundle_amount_actual = round(total_bundle_amount_actual, 2)
+
+	# Setting Difference Amount
+	doc.bundle_difference_amount = round((doc.total_bundle_amount_actual - doc.total_bundle_amount), 2)
+
+def validate_bundle_amount_difference(doc):
+	"""
+	Method to validate bundle difference amount on submission of stock entry
+	"""
+	if doc.bundle_difference_amount:
+		title = 'Check Difference Amount'
+		msg = 'Cannot submit the stock entry due to difference amount of {0} for bundle items'.format(frappe.bold(doc.bundle_difference_amount))
+		frappe.throw(title=title, msg=msg)
 
 @frappe.whitelist()
 def get_bundle_items(bundle_item):
