@@ -795,8 +795,9 @@ def submit_transactions(stn_entry_name):
 					frappe.db.savepoint("before_se_submit")
 					try:
 						se_doc = frappe.get_doc('Stock Entry', stn_row.stock_entry)
-						se_doc.save(ignore_permissions=True)
-						se_doc.submit()
+						if se_doc.docstatus == 0:
+							se_doc.save(ignore_permissions=True)
+							se_doc.submit()
 					except Exception as e:
 						frappe.db.rollback(save_point="before_se_submit")
 						exception_msg = f"Failed to submit Stock Entry: {stn_row.stock_entry} - {str(e)}"
@@ -809,9 +810,10 @@ def submit_transactions(stn_entry_name):
 					frappe.db.savepoint("before_si_submit")
 					try:
 						si_doc = frappe.get_doc('Sales Invoice', stn_row.sales_invoice)
-						si_doc.discount_amount = 0 #To trigger discount calculation
-						si_doc.save(ignore_permissions=True)
-						si_doc.submit()
+						if si_doc.docstatus == 0:
+							si_doc.discount_amount = 0 #To trigger discount calculation
+							si_doc.save(ignore_permissions=True)
+							si_doc.submit()
 					except Exception as e:
 						frappe.db.rollback(save_point="before_si_submit")
 						exception_msg = f"Failed to submit Sales Invoice: {stn_row.sales_invoice} - {str(e)}"
@@ -824,9 +826,10 @@ def submit_transactions(stn_entry_name):
 					frappe.db.savepoint("before_pi_submit")
 					try:
 						pi_doc = frappe.get_doc('Purchase Invoice', stn_row.purchase_invoice)
-						pi_doc.discount_amount = 0 #To trigger discount calculation
-						pi_doc.save(ignore_permissions=True)
-						pi_doc.submit()
+						if pi_doc.docstatus == 0:
+							pi_doc.discount_amount = 0 #To trigger discount calculation
+							pi_doc.save(ignore_permissions=True)
+							pi_doc.submit()
 					except Exception as e:
 						frappe.db.rollback(save_point="before_pi_submit")
 						exception_msg = f"Failed to submit Purchase Invoice: {stn_row.purchase_invoice} - {str(e)}"
