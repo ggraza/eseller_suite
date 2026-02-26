@@ -163,7 +163,6 @@ class SalesOrderOverride(SalesOrder):
 			Handle FC-based warehouse & company changes.
 			Supports multiple logs per item_code (qty split across warehouses).
 		"""
-
 		if not self.amazon_order_id:
 			return
 
@@ -231,19 +230,16 @@ class SalesOrderOverride(SalesOrder):
 			Method to change all fields relevent to company
 		'''
 		self.company_address = get_company_address(self.company).get('company_address') or ''
-		print("self.company_address : ", self.company_address)
 		company_abr, default_cc = frappe.db.get_value('Company', self.company, ['abbr', 'cost_center'])
 		for row in self.items:
 			if row.cost_center:
 				current_cc = row.cost_center
 				new_cc = re.sub(r"-[^-]*$", f"- {company_abr}", current_cc)
 				row.cost_center = new_cc if frappe.db.exists('Cost Center', new_cc) else default_cc
-				print("Cost center changed to : ", row.cost_center)
 			if row.item_tax_template:
 				current_tax_temp = row.item_tax_template
 				new_tax_temp = re.sub(r"-[^-]*$", f"- {company_abr}", current_tax_temp)
 				row.item_tax_template = new_tax_temp if frappe.db.exists('Item Tax Template', new_tax_temp) else ''
-				print("Item Tax template changed to ", row.item_tax_template)
 		self.packed_items = []
 
 		for row in self.taxes:
@@ -251,11 +247,8 @@ class SalesOrderOverride(SalesOrder):
 				current_cc = row.cost_center
 				new_cc = re.sub(r"-[^-]*$", f"- {company_abr}", current_cc)
 				row.cost_center = new_cc if frappe.db.exists('Cost Center', new_cc) else default_cc
-				print("Cost center changed to : ", row.cost_center)
 			if row.account_head:
 				row.account_head = get_account_head(row.account_head, self.company)
-				print("account_head changed to : ", row.account_head)
-
 
 def get_account_head(current_acc, company):
 	'''
@@ -272,7 +265,6 @@ def get_account_head(current_acc, company):
 	new_account_doc.parent_account = get_account_head(current_acc_parent, company)
 	new_account_doc.insert(ignore_permissions=True)
 	return new_account_doc.name
-
 
 @frappe.whitelist()
 def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
