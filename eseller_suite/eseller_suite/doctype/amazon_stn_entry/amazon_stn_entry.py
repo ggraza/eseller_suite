@@ -326,6 +326,9 @@ class AmazonSTNEntry(Document):
 				"qty": qty,
 				"transfer_qty": qty,
 				"uom": stock_uom,
+				"basic_rate": basic_rate,
+				"amount": invoice_value,
+				"base_amount": invoice_value,
 				"s_warehouse": row.source_warehouse,
 				"t_warehouse": row.target_warehouse,
 				"basic_rate": basic_rate,
@@ -349,7 +352,6 @@ class AmazonSTNEntry(Document):
 				"allow_zero_valuation_rate": 1,
 				"set_basic_rate_manually": 1
 			})
-
 			add_bundle_components_to_stock_entry(se=se, bundle_item_code=row.item, bundle_qty=qty, bundle_rate=basic_rate ,source_warehouse=row.source_warehouse, target_warehouse=row.target_warehouse)
 		return True
 
@@ -388,7 +390,6 @@ class AmazonSTNEntry(Document):
 		if not self.add_item_to_stock_entry(se, row):
 			self.add_error_log(row, f"{row.item} is not a stock or bundle item.")
 			return
-
 		se.amazon_invoice_value = flt(se.amazon_invoice_value) + flt(row.invoice_value)
 		se.insert(ignore_permissions=True)
 		frappe.db.set_value(row.doctype, row.name, {

@@ -628,6 +628,13 @@ def get_stock_entry_custom_fields():
 				"read_only": 1,
 				"insert_after": "item_name",
 			},
+			{
+				"fieldname": "from_bundle_item",
+				"fieldtype": "Check",
+				"label": "From Bundle Item",
+				"hidden": 1,
+				"insert_after": "bundle_parent"
+			},
 		],
 		"Stock Entry": [
 			{
@@ -660,6 +667,42 @@ def get_stock_entry_custom_fields():
 				"label": "Bundle Items",
 				"insert_after": "items",
 				"options": "Stock Entry Detail",
+			},
+			{
+				"fieldname": "bundle_details_section",
+				"fieldtype": "Section Break",
+				"label": "",
+				"insert_after": "get_stock_and_rate",
+			},
+			{
+				"fieldname": "total_bundle_amount",
+				"fieldtype": "Currency",
+				"label": "Total Bundle Amount",
+				"default": 0,
+				"depends_on": 'eval: doc.bundle_items && doc.bundle_items.length',
+				"insert_after": "bundle_details_section",
+			},
+			{
+				"fieldname": "total_bundle_amount_actual",
+				"fieldtype": "Currency",
+				"label": "Total Bundle Amount(Actual)",
+				"default": 0,
+				"depends_on": 'eval: doc.bundle_items && doc.bundle_items.length',
+				"insert_after": "total_bundle_amount",
+			},
+			{
+				"fieldname": "bundle_details_column",
+				"fieldtype": "Column Break",
+				"label": "",
+				"insert_after": "total_bundle_amount_actual",
+			},
+			{
+				"fieldname": "bundle_difference_amount",
+				"fieldtype": "Currency",
+				"label": "Bundle Difference Amount",
+				"default": 0,
+				"depends_on": 'eval: doc.bundle_items && doc.bundle_items.length',
+				"insert_after": "bundle_details_column",
 			},
 		]
 	}
