@@ -14,6 +14,8 @@
   "amazon_stn_entry_configurations_section",
   "allow_missing_warehouse_creation",
   "parent_warehouses",
+  "main_warehouse",
+  "main_company",
   "amazon_payment_entry_accounts_section",
   "column_break_lzak",
   "amazon_reserve_fund",
@@ -201,13 +203,29 @@
    "label": "Parent Warehouses",
    "mandatory_depends_on": "eval:doc.allow_missing_warehouse_creation\n",
    "options": "eSeller Parent Warehouse"
+  },
+  {
+   "description": "Target Warehouse for FC Removal",
+   "fieldname": "main_warehouse",
+   "fieldtype": "Link",
+   "label": "Main Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "description": "Company of Main Warehouse",
+   "fetch_from": "main_warehouse.company",
+   "fieldname": "main_company",
+   "fieldtype": "Link",
+   "label": "Main Company",
+   "options": "Company",
+   "read_only": 1
   }
  ],
  "hide_toolbar": 1,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-11 16:31:28.632648",
+ "modified": "2026-02-26 11:07:25.088712",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "eSeller Settings",

@@ -118,8 +118,9 @@ class AmazonSTNEntry(Document):
 
 	def map_companies_and_warehouses(self, row):
 		"""Map companies and warehouses for the STN row."""
+		allowed_transaction_types = ['FC_TRANSFER', 'FC_REMOVAL']
 		# ToDo :: Except FC_TRANSFER
-		if row.transaction_type != 'FC_TRANSFER':
+		if row.transaction_type not in allowed_transaction_types:
 			self.add_error_log(row, f"Transaction Type with {row.transaction_type} is not handled right now.")
 			row.ready_to_process = 0
 			return
@@ -138,6 +139,16 @@ class AmazonSTNEntry(Document):
 				self.add_error_log(row,f"Source Warehouse not found for code: {row.source_fc} and company: {row.source_company}")
 		else:
 			self.add_error_log(row, f"Source Company not found for GSTIN: {row.source_gstin}")
+
+		if row.transaction_type == 'FC_REMOVAL':
+			main_warehouse = frappe.db.get_single_value("eSeller Settings", "main_warehouse")
+			main_company = frappe.db.get_single_value("eSeller Settings", "main_company")
+			if not main_warehouse or not main_company:
+				self.add_error_log(row, f"Main Warehouse or Main Company is not configured in eSeller Settings, It is required to process FC_REMOVAL.")
+				return
+			row.target_company = main_company
+			row.target_warehouse = main_warehouse
+			return
 
 		# Set target company and warehouse
 		row.target_company = self.get_company_from_gstin(row.target_gstin)
@@ -795,8 +806,9 @@ def submit_transactions(stn_entry_name):
 					frappe.db.savepoint("before_se_submit")
 					try:
 						se_doc = frappe.get_doc('Stock Entry', stn_row.stock_entry)
-						se_doc.save(ignore_permissions=True)
-						se_doc.submit()
+						if se_doc.docstatus == 0:
+							se_doc.save(ignore_permissions=True)
+							se_doc.submit()
 					except Exception as e:
 						frappe.db.rollback(save_point="before_se_submit")
 						exception_msg = f"Failed to submit Stock Entry: {stn_row.stock_entry} - {str(e)}"
@@ -809,9 +821,10 @@ def submit_transactions(stn_entry_name):
 					frappe.db.savepoint("before_si_submit")
 					try:
 						si_doc = frappe.get_doc('Sales Invoice', stn_row.sales_invoice)
-						si_doc.discount_amount = 0 #To trigger discount calculation
-						si_doc.save(ignore_permissions=True)
-						si_doc.submit()
+						if si_doc.docstatus == 0:
+							si_doc.discount_amount = 0 #To trigger discount calculation
+							si_doc.save(ignore_permissions=True)
+							si_doc.submit()
 					except Exception as e:
 						frappe.db.rollback(save_point="before_si_submit")
 						exception_msg = f"Failed to submit Sales Invoice: {stn_row.sales_invoice} - {str(e)}"
@@ -824,9 +837,10 @@ def submit_transactions(stn_entry_name):
 					frappe.db.savepoint("before_pi_submit")
 					try:
 						pi_doc = frappe.get_doc('Purchase Invoice', stn_row.purchase_invoice)
-						pi_doc.discount_amount = 0 #To trigger discount calculation
-						pi_doc.save(ignore_permissions=True)
-						pi_doc.submit()
+						if pi_doc.docstatus == 0:
+							pi_doc.discount_amount = 0 #To trigger discount calculation
+							pi_doc.save(ignore_permissions=True)
+							pi_doc.submit()
 					except Exception as e:
 						frappe.db.rollback(save_point="before_pi_submit")
 						exception_msg = f"Failed to submit Purchase Invoice: {stn_row.purchase_invoice} - {str(e)}"
