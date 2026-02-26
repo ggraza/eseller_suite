@@ -3,13 +3,12 @@
 
 frappe.ui.form.on("eSeller Settings", {
 	refresh(frm) {
+		set_filters(frm)
 		set_parent_warehouse_query(frm);
 	},
-
 	onload(frm) {
 		set_parent_warehouse_query(frm);
 	},
-
 	allow_missing_warehouse_creation(frm) {
 		if (frm.doc.allow_missing_warehouse_creation) {
 			populate_parent_warehouses(frm);
@@ -19,22 +18,31 @@ frappe.ui.form.on("eSeller Settings", {
 	}
 });
 
+function set_filters(frm) {
+	frm.set_query("main_warehouse", () => {
+		return {
+			filters: {
+				"is_group": 0
+			}
+		};
+	});
+}
+
 /**
  * Apply filter for parent warehouse based on company and is_group
  */
 function set_parent_warehouse_query(frm) {
 	if (!frm.fields_dict.parent_warehouses) return;
 
-	frm.fields_dict.parent_warehouses.grid.get_field("default_parent_warehouse").get_query =
-		function (doc, cdt, cdn) {
-			let row = locals[cdt][cdn];
-			return {
-				filters: {
-					company: row.company || "",
-					is_group: 1
-				}
-			};
+	frm.fields_dict.parent_warehouses.grid.get_field("default_parent_warehouse").get_query = function (doc, cdt, cdn) {
+		let row = locals[cdt][cdn];
+		return {
+			filters: {
+				company: row.company || "",
+				is_group: 1
+			}
 		};
+	};
 }
 
 /**
