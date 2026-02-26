@@ -163,7 +163,7 @@ class SalesOrderOverride(SalesOrder):
 			Handle FC-based warehouse & company changes.
 			Supports multiple logs per item_code (qty split across warehouses).
 		"""
-		if not self.amazon_order_id:
+		if not self.amazon_order_id or self.fulfillment_channel != "AFN":
 			return
 
 		shipment_logs = frappe.db.get_all(
@@ -229,6 +229,9 @@ class SalesOrderOverride(SalesOrder):
 		'''
 			Method to change all fields relevent to company
 		'''
+		if self.fulfillment_channel != "AFN":
+			return
+
 		self.company_address = get_company_address(self.company).get('company_address') or ''
 		company_abr, default_cc = frappe.db.get_value('Company', self.company, ['abbr', 'cost_center'])
 		for row in self.items:

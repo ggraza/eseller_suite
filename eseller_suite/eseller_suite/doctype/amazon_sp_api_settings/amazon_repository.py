@@ -168,7 +168,7 @@ class AmazonRepository:
 
 	def get_account(self, name) -> str:
 		account_name = frappe.db.get_value(
-			"Account", {"account_name": "Amazon {0}".format(name)}
+			"Account", {"account_name": "Amazon {0}".format(name), 'company':self.amz_setting.company }
 		)
 
 		if not account_name:
@@ -1362,7 +1362,7 @@ class AmazonRepository:
 			if self.amz_setting.temporary_stock_transfer_required:
 				warehouse = self.amz_setting.temporary_order_warehouse
 
-			if self.amz_setting.fc_based_invoice_creation:
+			if so.fulfillment_channel == "AFN" and self.amz_setting.fc_based_invoice_creation:
 				if so.company:
 					company = so.company
 				if so.set_warehouse:
@@ -1597,7 +1597,7 @@ class AmazonRepository:
 				)
 
 				fc_data_exists = True
-				if self.amz_setting.fc_based_invoice_creation:
+				if so.fulfillment_channel == "AFN" and self.amz_setting.fc_based_invoice_creation:
 					fc_data_exists = True if so.fc_location else False
 
 				if order_status_valid and has_taxes and transfer_exists and fc_data_exists:
