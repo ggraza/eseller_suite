@@ -3,9 +3,9 @@
 
 import frappe
 
-def before_validate(doc, method):
+def before_save(doc, method):
 	'''
-		Method which trigger on before_validate event of Purhcase Invoice
+		Method which trigger on before_save event of Purchase Invoice
 	'''
 	set_bundle_diff_amount(doc)
 	set_discount_based_on_amazon_value(doc)
