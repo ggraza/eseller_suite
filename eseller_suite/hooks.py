@@ -152,7 +152,7 @@ doc_events = {
 	'Purchase Invoice':{
 		"on_cancel": "eseller_suite.eseller_suite.custom_script.purchase_invoice.purchase_invoice.on_cancel",
 		"on_submit": "eseller_suite.eseller_suite.custom_script.purchase_invoice.purchase_invoice.on_submit",
-		"before_validate": "eseller_suite.eseller_suite.custom_script.purchase_invoice.purchase_invoice.before_validate",
+		"before_save": "eseller_suite.eseller_suite.custom_script.purchase_invoice.purchase_invoice.before_save",
 	},
 	'Product Bundle':{
         "after_insert": "eseller_suite.eseller_suite.custom_script.product_bundle.product_bundle.mark_item_as_bundle",
