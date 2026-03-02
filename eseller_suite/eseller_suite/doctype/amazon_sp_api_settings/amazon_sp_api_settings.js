@@ -5,7 +5,6 @@ frappe.ui.form.on('Amazon SP API Settings', {
 	refresh(frm) {
 		set_filters(frm);
 		hanlde_retry_btn(frm);
-		handle_fetch_warehouses_btn(frm);
 		handle_report_btn(frm);
 	},
 });
@@ -104,85 +103,32 @@ function hanlde_retry_btn(frm) {
 			primary_action_label: 'Sync',
 			primary_action(values) {
 				d.hide();
-				let amazon_order_ids = (values.amazon_order_ids).split("\n");
-				for (let i = 0; i < amazon_order_ids.length; i++) {
-					frappe.call({
-						method: 'eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository.get_order',
-						args: {
-							amz_setting_name: frm.doc.name,
-							amazon_order_ids: amazon_order_ids[i]
-						},
-						freeze: true,
-						freeze_message: __("Syncing Sales Order.."),
-						callback: (r) => {
-							if (r && r.message) {
-								frappe.show_alert({
-									message: __('Sales Orders created/updated successfully'),
-									indicator: 'green'
-								}, 5);
-							}
+				// list object with new line seperation;
+				// let amazon_order_ids = values.amazon_order_ids.split(/\r?\n/).map(id => id.trim()).filter(id => id.length > 0).join(",");
+				// String object with , seperated values
+				let amazon_order_ids = values.amazon_order_ids.split(/\r?\n/).map(id => id.trim()).filter(id => id.length > 0).join(",");
+				frappe.call({
+					method: 'eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository.get_orders',
+					args: {
+						last_updated_after: frappe.datetime.get_today(),
+						amz_setting_name: frm.doc.name,
+						amazon_order_ids: amazon_order_ids
+					},
+					freeze: true,
+					freeze_message: __("Syncing Sales Order.."),
+					callback: (r) => {
+						if (r && r.message) {
+							frappe.show_alert({
+								message: __('Sales Orders created/updated successfully'),
+								indicator: 'green'
+							}, 5);
 						}
-					})
-				}
+					}
+				})
 			}
 		});
 		d.show();
 	});
-}
-
-function handle_fetch_warehouses_btn(frm) {
-	if (!frm.doc.__islocal && frm.doc.is_active) {
-		frm.add_custom_button(__('Fetch Warehouses'), () => {
-			frappe.confirm(
-				__('Are you sure you want to fetch warehouses from Amazon? This will create warehouses in ERPNext if they do not already exist.'),
-				() => {
-					// User confirmed
-					frappe.call({
-						method: 'fetch_warehouses',
-						doc: frm.doc,
-						freeze: true,
-						freeze_message: __('Fetching warehouses from Amazon...'),
-						callback: (r) => {
-							if (r && r.message) {
-								const result = r.message;
-								let message = result.message || __('Warehouses fetched successfully.');
-
-								if (result.created > 0 || result.skipped > 0) {
-									let details = [];
-									if (result.created > 0) {
-										details.push(__('{0} warehouse(s) created', [result.created]));
-									}
-									if (result.skipped > 0) {
-										details.push(__('{0} warehouse(s) already exist', [result.skipped]));
-									}
-									if (result.errors > 0) {
-										details.push(__('{0} error(s) occurred', [result.errors]));
-									}
-									message = details.join('. ') + '.';
-								}
-
-								frappe.show_alert({
-									message: message,
-									indicator: result.status === 'success' ? 'green' : 'orange'
-								}, 5);
-
-								// Reload the form to refresh any warehouse-related fields
-								frm.reload_doc();
-							} else {
-								frappe.show_alert({
-									message: __('Failed to fetch warehouses. Please check the error log.'),
-									indicator: 'red'
-								}, 5);
-							}
-						}
-					});
-				},
-				() => {
-					// User cancelled
-				}
-			);
-		});
-	}
 }
 
 function handle_report_btn(frm) {

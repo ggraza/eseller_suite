@@ -25,12 +25,12 @@ function hanlde_fetch_order_btn(frm) {
 		let sp_api_settings = r.message.name;
 		if (sp_api_settings) {
 			if (!frm.is_new() && !frm.doc.invoice_created) {
-				frappe.call('eseller_suite.eseller_suite.doctype.afn_order_shipment_log.afn_order_shipment_log.check_so_existance_and_rq_job', {
+				frappe.call('eseller_suite.eseller_suite.doctype.afn_order_shipment_log.afn_order_shipment_log.check_rq_job_existance', {
 					amazon_order_id: frm.doc.amazon_order_id,
 					amz_setting_name: sp_api_settings
 				}).then(r => {
 					if (r.message) {
-						frm.add_custom_button('Fetch Sales Order', () => {
+						frm.add_custom_button('Fetch/Update Sales Order', () => {
 							frappe.call({
 								method: 'eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository.get_order',
 								args: {
@@ -50,6 +50,9 @@ function hanlde_fetch_order_btn(frm) {
 								}
 							})
 						})
+					}
+					else {
+						frm.set_intro('Order syncing has been done via background jobs, Please wait!', 'orange');
 					}
 				})
 			}

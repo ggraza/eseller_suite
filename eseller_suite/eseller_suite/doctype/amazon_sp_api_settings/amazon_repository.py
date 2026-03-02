@@ -1643,7 +1643,7 @@ class AmazonRepository:
 
 			return so.name
 
-	def get_orders(self, last_updated_after, sync_selected_date_only=0) -> list:
+	def get_orders(self, last_updated_after, sync_selected_date_only=0, amazon_order_ids=None) -> list:
 		orders = self.get_orders_instance()
 
 		order_statuses = [
@@ -1654,6 +1654,7 @@ class AmazonRepository:
 		]
 		fulfillment_channels = ["AFN", "MFN"]
 		orders_payload = None
+		amazon_order_ids = amazon_order_ids if amazon_order_ids else ''
 		try:
 			if sync_selected_date_only:
 				last_updated_before = add_days(getdate(last_updated_after), 1).strftime(
@@ -1665,6 +1666,7 @@ class AmazonRepository:
 					last_updated_before=last_updated_before,
 					order_statuses=order_statuses,
 					fulfillment_channels=fulfillment_channels,
+					amazon_order_ids = amazon_order_ids,
 					max_results=50,
 				)
 			else:
@@ -1673,10 +1675,12 @@ class AmazonRepository:
 					last_updated_after=to_iso_z(last_updated_after),
 					order_statuses=order_statuses,
 					fulfillment_channels=fulfillment_channels,
+					amazon_order_ids = amazon_order_ids,
 					max_results=50,
 				)
 		except Exception as e:
 			frappe.log_error(title="GET Orders", message=frappe.get_traceback(e))
+
 		sales_orders = []
 		while True:
 			if orders_payload:
@@ -1761,7 +1765,6 @@ class AmazonRepository:
 			order_id=amazon_order_ids,
 		)
 		# order_call = orders.get_order(order_id=amazon_order_ids)
-		# frappe.log_error(title="Order Payload", message=f"{order_payload}")
 		sales_orders = []
 		if order_payload:
 			order_id = order_payload.get("AmazonOrderId", amazon_order_ids)
@@ -1815,7 +1818,7 @@ class AmazonRepository:
 						)
 				# Re-throw with enhanced error message
 				frappe.throw(enhanced_error)
-		# frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", sales_orders=sales_orders)
+		frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", sales_orders=sales_orders)
 		return sales_orders
 
 	def get_catalog_items_instance(self) -> CatalogItems:
@@ -1837,11 +1840,10 @@ def to_iso_z(d):
 		dt = d.astimezone(timezone.utc)
 	return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-
-def get_orders(amz_setting_name, last_updated_after, sync_selected_date_only=0) -> list:
+@frappe.whitelist()
+def get_orders(amz_setting_name, last_updated_after, sync_selected_date_only=0, amazon_order_ids=None) -> list:
 	ar = AmazonRepository(amz_setting_name)
-	return ar.get_orders(last_updated_after, sync_selected_date_only)
-
+	return ar.get_orders(last_updated_after, sync_selected_date_only, amazon_order_ids)
 
 @frappe.whitelist()
 def get_order(amz_setting_name, amazon_order_ids) -> list:

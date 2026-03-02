@@ -282,7 +282,6 @@ class Orders(SPAPI):
 		self.list_to_dict("FulfillmentChannels", fulfillment_channels, data)
 		self.list_to_dict("PaymentMethods", payment_methods, data)
 		self.list_to_dict("EasyShipShipmentStatuses", easyship_shipment_statuses, data)
-		# self.list_to_dict("AmazonOrderIds", amazon_order_ids, data)
 
 		if not marketplace_ids:
 			marketplace_ids = [self.marketplace_id]

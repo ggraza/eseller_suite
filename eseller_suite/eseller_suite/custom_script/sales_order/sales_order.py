@@ -61,7 +61,10 @@ class SalesOrderOverride(SalesOrder):
 		sales_invoice.update_stock = 1
 		sales_invoice.insert(ignore_permissions=True)
 
+		self.update_shipment_logs(submit=1)
+
 	def on_update(self):
+		self.update_shipment_logs()
 		if self.amazon_order_status == "Canceled" and self.temporary_stock_tranfer_id:
 			if frappe.db.exists("Stock Entry", {"name":self.temporary_stock_tranfer_id, "docstatus":["!=", 2]}):
 				temp_stock_transfer_doc = frappe.get_doc("Stock Entry", self.temporary_stock_tranfer_id)
@@ -252,6 +255,17 @@ class SalesOrderOverride(SalesOrder):
 				row.cost_center = new_cc if frappe.db.exists('Cost Center', new_cc) else default_cc
 			if row.account_head:
 				row.account_head = get_account_head(row.account_head, self.company)
+
+	def update_shipment_logs(self, submit=0):
+		'''
+			Method to update shipment logs with invoiced as 1 when sales order is submitted
+		'''
+		if self.amazon_order_id:
+			if frappe.db.exists('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id}):
+				if submit:
+					frappe.db.set_value('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id}, 'invoice_created', 1, update_modified=False)
+				else:
+					frappe.db.set_value('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id}, 'order_created', 1, update_modified=False)
 
 def get_account_head(current_acc, company):
 	'''
