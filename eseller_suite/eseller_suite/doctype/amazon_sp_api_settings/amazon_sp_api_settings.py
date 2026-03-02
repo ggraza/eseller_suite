@@ -559,11 +559,8 @@ def schedule_get_order_details_daily():
 		get_orders(amz_setting_name=amz_setting.name, last_updated_after=from_date)
 		frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", queue="long")
 
-def enq_si_submit(sales_orders = []):
-	if not sales_orders:
-		sales_invoices = frappe.db.get_all("Sales Invoice", {"docstatus":0, "amazon_order_id":["is", "set"]}, pluck="name")
-	else:
-		sales_invoices = frappe.db.get_all("Sales Invoice Item", {"sales_order":["in", sales_orders]}, pluck="parent")
+def enq_si_submit():
+	sales_invoices = frappe.db.get_all("Sales Invoice", {"docstatus":0, "amazon_order_id":["is", "set"]}, pluck="name")
 	for sales_invoice_name in sales_invoices:
 		frappe.db.savepoint("before_testing_si_submit")
 		sales_invoice = None
