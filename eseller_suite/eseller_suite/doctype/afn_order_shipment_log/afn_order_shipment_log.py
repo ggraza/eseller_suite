@@ -2,8 +2,9 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe.utils import getdate, today
 from frappe.model.document import Document
-
+from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository import get_orders
 
 class AFNOrderShipmentLog(Document):
 	def before_save(self):
@@ -39,6 +40,10 @@ class AFNOrderShipmentLog(Document):
 				exception_msg = f"Warehouse not found FC : {self.fc_code}"
 				self.add_exceptions(exception_msg)
 
+		#Setting Order Created
+		if frappe.db.exists('Sales Invoice', { 'amazon_order_id': self.amazon_order_id }):
+			self.order_created = 1
+
 		if self.company and self.warehouse and self.item_code:
 			self.exceptions = ''
 		self.has_exceptions = 1 if self.exceptions else 0
@@ -60,9 +65,9 @@ def retry_fetching_selected_logs(docnames):
 	return "Success"
 
 @frappe.whitelist()
-def check_so_existance_and_rq_job(amazon_order_id, amz_setting_name):
+def check_rq_job_existance(amazon_order_id, amz_setting_name):
 	'''
-		Method to check wether RQ Job for Get Order is working or not. Along with Sales Order existance for given Order ID
+		Method to check wether RQ Job for Get Order is working or not
 	'''
 	scheduler_rq_jobs = frappe.db.get_all('RQ Job', {
 		'job_name': 'eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.schedule_get_order_details',
@@ -74,6 +79,35 @@ def check_so_existance_and_rq_job(amazon_order_id, amz_setting_name):
 	})
 	if scheduler_rq_jobs or sync_rq_jobs:
 		return 0
-	if frappe.db.exists('Sales Order', { 'amazon_order_id':amazon_order_id, 'docstatus':'1' }):
-		return 0
 	return 1
+
+@frappe.whitelist()
+def fetch_sales_orders(docnames):
+	'''
+		Method to fetch missing values from list view
+	'''
+	last_updated_after = getdate(today())
+	amz_setting_name = frappe.db.get_all('Amazon SP API Settings', { 'is_active':1 }, pluck='name', limit=1) or []
+	if not amz_setting_name:
+		frappe.msgprint("No active Amazon SP API Settings found. Please create and activate one to fetch orders.", indicator='red')
+		return
+	amz_setting_name = amz_setting_name[0]
+
+	if isinstance(docnames, str):
+		docnames = frappe.parse_json(docnames)
+
+	filtered_order_ids = frappe.db.get_all(
+		"AFN Order Shipment Log",
+		filters={"name": ["in", docnames], "has_exceptions": 0},
+		pluck="amazon_order_id",
+		limit=20
+	)
+
+	# Remove duplicates
+	unique_order_ids = list(set(filtered_order_ids))
+
+	# Convert to comma separated string
+	amazon_order_ids = ",".join(unique_order_ids)
+
+	orders = get_orders(amz_setting_name=amz_setting_name, last_updated_after=last_updated_after, amazon_order_ids=amazon_order_ids)
+	return orders

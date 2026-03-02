@@ -21,6 +21,7 @@
   "item_code",
   "warehouse",
   "company",
+  "order_created",
   "invoice_created",
   "has_exceptions",
   "column_break_zxol",
@@ -141,7 +142,7 @@
    "default": "0",
    "fieldname": "invoice_created",
    "fieldtype": "Check",
-   "in_standard_filter": 1,
+   "in_list_view": 1,
    "label": "Invoice Created",
    "read_only": 1
   },
@@ -153,13 +154,21 @@
    "in_standard_filter": 1,
    "label": "Has Exceptions",
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "order_created",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Order Created",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-02-19 11:26:22.081419",
+ "modified": "2026-03-02 14:46:34.380712",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "AFN Order Shipment Log",

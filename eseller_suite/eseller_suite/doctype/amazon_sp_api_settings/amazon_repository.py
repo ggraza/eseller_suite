@@ -1765,7 +1765,6 @@ class AmazonRepository:
 			order_id=amazon_order_ids,
 		)
 		# order_call = orders.get_order(order_id=amazon_order_ids)
-		# frappe.log_error(title="Order Payload", message=f"{order_payload}")
 		sales_orders = []
 		if order_payload:
 			order_id = order_payload.get("AmazonOrderId", amazon_order_ids)
@@ -1819,7 +1818,7 @@ class AmazonRepository:
 						)
 				# Re-throw with enhanced error message
 				frappe.throw(enhanced_error)
-		# frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", sales_orders=sales_orders)
+		frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", sales_orders=sales_orders)
 		return sales_orders
 
 	def get_catalog_items_instance(self) -> CatalogItems:
