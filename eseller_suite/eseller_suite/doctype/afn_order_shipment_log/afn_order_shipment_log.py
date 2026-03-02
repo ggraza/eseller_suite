@@ -74,6 +74,6 @@ def check_so_existance_and_rq_job(amazon_order_id, amz_setting_name):
 	})
 	if scheduler_rq_jobs or sync_rq_jobs:
 		return 0
-	if frappe.db.exists('Sales Order', { 'amazon_order_id':amazon_order_id, 'docstatus':['!=', 2] }):
+	if frappe.db.exists('Sales Order', { 'amazon_order_id':amazon_order_id, 'docstatus':'1' }):
 		return 0
 	return 1

@@ -30,7 +30,7 @@ function hanlde_fetch_order_btn(frm) {
 					amz_setting_name: sp_api_settings
 				}).then(r => {
 					if (r.message) {
-						frm.add_custom_button('Fetch Sales Order', () => {
+						frm.add_custom_button('Fetch/Update Sales Order', () => {
 							frappe.call({
 								method: 'eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository.get_order',
 								args: {
