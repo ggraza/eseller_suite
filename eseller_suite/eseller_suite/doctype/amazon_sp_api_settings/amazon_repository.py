@@ -1752,10 +1752,7 @@ class AmazonRepository:
 				)
 			else:
 				break
-		frappe.enqueue(
-			"eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit",
-			sales_orders=sales_orders,
-		)
+		frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", queue="long")
 		return sales_orders
 
 	def get_order(self, amazon_order_ids) -> list:
@@ -1818,7 +1815,7 @@ class AmazonRepository:
 						)
 				# Re-throw with enhanced error message
 				frappe.throw(enhanced_error)
-		frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", sales_orders=sales_orders)
+		frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", queue="long")
 		return sales_orders
 
 	def get_catalog_items_instance(self) -> CatalogItems:
