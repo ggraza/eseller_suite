@@ -8,6 +8,9 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_days, getdate, now_datetime, today, get_date_str
+
+from erpnext.stock.utils import get_stock_balance
+
 import pytz
 
 
@@ -562,35 +565,39 @@ def schedule_get_order_details_daily():
 def enq_si_submit():
 	sales_invoices = frappe.db.get_all("Sales Invoice", {"docstatus":0, "amazon_order_id":["is", "set"]}, pluck="name")
 	for sales_invoice_name in sales_invoices:
-		frappe.db.savepoint("before_testing_si_submit")
-		sales_invoice = None
+		si_doc = frappe.get_doc("Sales Invoice", sales_invoice_name)
+		enq_si_submit_doc(si_doc)
+
+def enq_si_submit_doc(sales_invoice):
+	insufficient_stock = False
+	error_records = []
+
+	# Collect stock levels for all items first (Assumption: Bulk fetching is possible)
+	stock_levels = {item.item_code: get_stock_balance(item.item_code, item.warehouse, sales_invoice.posting_date)
+					for item in sales_invoice.items}
+
+	for item in sales_invoice.items:
+		stock_qty = stock_levels.get(item.item_code, 0)
+		if item.qty > stock_qty:
+			insufficient_stock = True
+			error_records.append({
+				"doctype": "Amazon Failed Invoice Record",
+				"invoice_id": sales_invoice.name,
+				"error": f"Insufficient stock for item {item.item_code} as of {sales_invoice.posting_date}. "
+						f"Available: {stock_qty}, Required: {item.qty}"
+			})
+
+	# Insert all error records in batch
+	if error_records:
+		for record in error_records:
+			frappe.get_doc(record).insert()
+
+	if not insufficient_stock:
 		try:
-			sales_invoice = frappe.get_doc("Sales Invoice", sales_invoice_name)
+			sales_invoice.flags.ignore_links = True
 			sales_invoice.submit()
-		except Exception as e:
-			frappe.db.rollback(save_point="before_testing_si_submit")
-			# Log error and skip this invoice, continue with next invoice
-			error_msg = str(e)
-			# Enhance HSN/SAC errors with item information
-			enhanced_error = enhance_hsn_error_with_items(error_msg, sales_invoice)
-			frappe.log_error(
-				title=f"Failed to submit Sales Invoice: {sales_invoice_name}",
-				message=f"Invoice: {sales_invoice_name}\nError: {enhanced_error}\nTraceback: {frappe.get_traceback()}",
-			)
-			# Create failed invoice record if it doesn't exist
-			if not frappe.db.exists("Amazon Failed Invoice Record", {"invoice_id": sales_invoice_name}):
-				try:
-					frappe.get_doc({
-						"doctype": "Amazon Failed Invoice Record",
-						"invoice_id": sales_invoice_name,
-						"error": str(e)
-					}).insert(ignore_permissions=True)
-				except Exception as save_error:
-					frappe.log_error(
-						title=f"Failed to create Amazon Failed Invoice Record for {sales_invoice_name}",
-						message=str(save_error)
-					)
-			continue
+		except:
+			pass
 
 def create_report_api_log(report_id, report_type, from_date, to_date):
 	'''

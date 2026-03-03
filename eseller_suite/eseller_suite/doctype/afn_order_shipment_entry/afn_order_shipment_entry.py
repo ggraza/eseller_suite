@@ -17,6 +17,9 @@ class AFNOrderShipmentEntry(Document):
 	def on_submit(self):
 		self.process_afn_shipement_file()
 
+	def on_trash(self):
+		self.delete_linked_documents()
+
 	def process_afn_shipement_file(self):
 		'''Fetch and validate the attached STN CSV file.'''
 		if not self.afn_shipment_file:
@@ -54,6 +57,7 @@ class AFNOrderShipmentEntry(Document):
 		key_mapping = {
 			'amazon-order-id': 'amazon_order_id',
 			'shipment-id': 'shipment_id',
+			'shipment-item-id': 'shipment_item_id',
 			'amazon-order-item-id': 'amazon_order_item_id',
 			'tracking-number': 'tracking_number',
 			'fulfillment-center-id': 'fc_code',
@@ -71,14 +75,28 @@ class AFNOrderShipmentEntry(Document):
 				afn_shipment_row[fieldname] = value.strip() if isinstance(value, str) else value
 				afn_shipment_row['afn_order_shipment_entry'] = self.name
 				afn_shipment_row['doctype'] = 'AFN Order Shipment Log'
-		
+
 		amazon_order_id = afn_shipment_row.get('amazon_order_id', '')
-		amazon_order_item_id = afn_shipment_row.get('amazon_order_item_id', '')
-		if not amazon_order_id or not amazon_order_item_id:
+		shipment_item_id = afn_shipment_row.get('shipment_item_id', '')
+		if not amazon_order_id or not shipment_item_id:
 			return
 		try:
-			if not frappe.db.exists('AFN Order Shipment Log', { 'amazon_order_id':amazon_order_id, 'amazon_order_item_id': amazon_order_item_id }):
+			if not frappe.db.exists('AFN Order Shipment Log', { 'amazon_order_id':amazon_order_id, 'shipment_item_id': shipment_item_id }):
 				frappe.get_doc(afn_shipment_row).insert(ignore_permissions=True)
 		except Exception as e:
 			error_msg = f'Error while creating AFN Shipment Log : {str(e)}'
 			frappe.log_error(title=f'AFN Log creation failed ID :{self.name}', message=error_msg)
+
+	def delete_linked_documents(self):
+		'''
+			Delete linked AFN Shipment Log entries when the main document is deleted.
+		'''
+		# Delete linked submission queue entry
+		if frappe.db.exists('Submission Queue', {"ref_doctype": self.doctype, "ref_docname": self.name}):
+			frappe.db.delete('Submission Queue', {"ref_doctype": self.doctype, "ref_docname": self.name})
+
+		if frappe.db.exists('AFN Order Shipment Log', { "afn_order_shipment_entry": self.name }):
+			frappe.db.delete('AFN Order Shipment Log', { "afn_order_shipment_entry": self.name })
+
+		if frappe.db.exists('Amazon Report API Log', {"reference_dt": self.doctype, "reference_dn": self.name}):
+			frappe.db.delete('Amazon Report API Log', {"reference_dt": self.doctype, "reference_dn": self.name})

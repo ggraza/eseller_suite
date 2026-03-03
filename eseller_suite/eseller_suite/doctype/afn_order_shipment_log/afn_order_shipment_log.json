@@ -9,6 +9,7 @@
   "afn_order_shipment_entry",
   "amazon_order_id",
   "shipment_id",
+  "shipment_item_id",
   "amazon_order_item_id",
   "tracking_number",
   "column_break_hdiw",
@@ -22,6 +23,7 @@
   "warehouse",
   "company",
   "order_created",
+  "fc_processed",
   "invoice_created",
   "has_exceptions",
   "column_break_zxol",
@@ -162,13 +164,25 @@
    "in_list_view": 1,
    "label": "Order Created",
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "fc_processed",
+   "fieldtype": "Check",
+   "label": "FC Processed"
+  },
+  {
+   "fieldname": "shipment_item_id",
+   "fieldtype": "Data",
+   "label": "Shipment Item ID",
+   "read_only": 1
   }
  ],
  "grid_page_length": 50,
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-02 14:46:34.380712",
+ "modified": "2026-03-03 12:24:51.512224",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "AFN Order Shipment Log",
