@@ -1606,6 +1606,7 @@ class AmazonRepository:
 
 				if order_status_valid and has_taxes and transfer_exists and fc_data_exists:
 					try:
+						so.save(ignore_permissions=True)
 						so.submit()
 					except Exception as e:
 						error_msg = str(e)
