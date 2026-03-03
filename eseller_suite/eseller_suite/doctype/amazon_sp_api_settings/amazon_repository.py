@@ -166,22 +166,26 @@ class AmazonRepository:
 	def get_finances_instance(self) -> Finances:
 		return Finances(**self.instance_params)
 
-	def get_account(self, name) -> str:
+	def get_account(self, name, company=None) -> str:
+		if not company:
+			company = self.amz_setting.company
 		account_name = frappe.db.get_value(
-			"Account", {"account_name": "Amazon {0}".format(name), 'company':self.amz_setting.company }
+			"Account", {"account_name": "Amazon {0}".format(name), 'company': company }
 		)
 
 		if not account_name:
 			new_account = frappe.new_doc("Account")
 			new_account.account_name = "Amazon {0}".format(name)
-			new_account.company = self.amz_setting.company
+			new_account.company = company
 			new_account.parent_account = self.amz_setting.market_place_account_group
 			new_account.insert(ignore_permissions=True)
 			account_name = new_account.name
 
 		return account_name
 
-	def get_charges_and_fees(self, order_id) -> dict:
+	def get_charges_and_fees(self, order_id, company=None) -> dict:
+		if not company:
+			company = self.amz_setting.company
 		finances = self.get_finances_instance()
 		financial_events_payload = self.call_sp_api_method(
 			sp_api_method=finances.list_financial_events_by_order_id, order_id=order_id
@@ -233,7 +237,7 @@ class AmazonRepository:
 							)
 
 							if charge_type != "Principal" and float(amount) != 0:
-								charge_account = self.get_account(charge_type)
+								charge_account = self.get_account(charge_type, company)
 								charges_and_fees.get("charges").append(
 									{
 										"charge_type": "Actual",
@@ -252,7 +256,7 @@ class AmazonRepository:
 							amount = fee.get("FeeAmount", {}).get("CurrencyAmount", 0)
 
 							if float(amount) != 0:
-								fee_account = self.get_account(fee_type)
+								fee_account = self.get_account(fee_type, company)
 								charges_and_fees.get("fees").append(
 									{
 										"charge_type": "Actual",
@@ -268,7 +272,7 @@ class AmazonRepository:
 								"CurrencyAmount", 0
 							)
 							if float(amount) != 0:
-								tds_account = self.get_account(tds_type)
+								tds_account = self.get_account(tds_type, company)
 								charges_and_fees.get("tds").append(
 									{
 										"charge_type": "Actual",
@@ -295,7 +299,7 @@ class AmazonRepository:
 							"CurrencyAmount", 0
 						)
 						if float(amount) != 0:
-							fee_account = self.get_account(fee_type)
+							fee_account = self.get_account(fee_type, company)
 							charges_and_fees.get("service_fees").append(
 								{
 									"charge_type": "Actual",
@@ -972,6 +976,7 @@ class AmazonRepository:
 		order_id = order.get("AmazonOrderId")
 		order_date = format_date_time_to_ist(order.get("PurchaseDate"))
 		amazon_order_amount = order.get("OrderTotal", {}).get("Amount", 0)
+		company = self.amz_setting.company
 		so_id = None
 		so_docstatus = 0
 		refunds = get_refunds(self, order_id, order_date, amazon_order_amount)
@@ -1354,7 +1359,6 @@ class AmazonRepository:
 			)
 			so.transaction_date = get_datetime(transaction_date).strftime("%Y-%m-%d")
 			so.transaction_time = get_datetime(transaction_date).strftime("%H:%M:%S")
-			company = self.amz_setting.company
 			warehouse = self.amz_setting.warehouse
 			if so.fulfillment_channel:
 				if so.fulfillment_channel == "AFN":
@@ -1460,7 +1464,7 @@ class AmazonRepository:
 					row.total_order_value = total_value
 
 			if taxes_and_charges:
-				charges_and_fees = self.get_charges_and_fees(order_id)
+				charges_and_fees = self.get_charges_and_fees(order_id, company)
 				if charges_and_fees.get("principal_amounts"):
 					principal_amounts = charges_and_fees.get("principal_amounts")
 					for item_row in so.items:
