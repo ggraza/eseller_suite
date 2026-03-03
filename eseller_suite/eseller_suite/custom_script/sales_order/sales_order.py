@@ -9,7 +9,6 @@ from erpnext.accounts.party import get_party_account
 from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from erpnext.stock.doctype.item.item import get_item_defaults
-from erpnext.stock.utils import get_stock_balance
 from erpnext.stock.doctype.packed_item.packed_item import make_packing_list
 
 import re
@@ -171,7 +170,7 @@ class SalesOrderOverride(SalesOrder):
 
 		shipment_logs = frappe.db.get_all(
 			'AFN Order Shipment Log',
-			filters={'amazon_order_id': self.amazon_order_id},
+			filters={'amazon_order_id': self.amazon_order_id, 'fc_processed':0},
 			fields=['fc_code', 'item_code', 'warehouse', 'company', 'qty']
 		)
 
@@ -189,6 +188,10 @@ class SalesOrderOverride(SalesOrder):
 		new_items = []
 
 		for row in self.items:
+			if row.fc_location:
+				new_items.append(row)
+				continue
+
 			logs = log_map.get(row.item_code)
 
 			# If no matching logs → keep row as is
@@ -205,18 +208,28 @@ class SalesOrderOverride(SalesOrder):
 				split_qty = min(remaining_qty, log.qty)
 				remaining_qty -= split_qty
 
-				# Duplicate row
+				# Duplicate row with split qty and log values
 				new_row = row.as_dict()
 				new_row["qty"] = split_qty
 				new_row["warehouse"] = log.warehouse
+				new_row["fc_location"] = log.fc_code
 				new_items.append(new_row)
+
+				# Duplicate row with split qty and log values
+				if remaining_qty > 0:
+					new_row_1 = row.as_dict()
+					new_row_1["qty"] = remaining_qty
+					new_items.append(new_row_1)
 
 				if self.company != log.company:
 					has_company_change = True
-				# Update header values based on first match
+
+				# Update header values based on last match
 				self.company = log.company
 				self.set_warehouse = log.warehouse
 				self.fc_location = log.fc_code
+
+		frappe.db.set_value('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id, 'fc_processed':0}, 'fc_processed', 1)
 
 		# Clear and re-add items
 		self.set("items", [])
@@ -226,6 +239,8 @@ class SalesOrderOverride(SalesOrder):
 		if has_company_change:
 			self.handle_company_changes()
 
+		# Clear and re-add packed items to trigger re-calculation based on new warehouses
+		self.packed_items = []
 		make_packing_list(self)
 
 	def handle_company_changes(self):
@@ -383,30 +398,3 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 
 	return doclist
 
-def enq_si_submit(sales_invoice):
-	insufficient_stock = False
-	error_records = []
-
-	# Collect stock levels for all items first (Assumption: Bulk fetching is possible)
-	stock_levels = {item.item_code: get_stock_balance(item.item_code, item.warehouse, sales_invoice.posting_date)
-					for item in sales_invoice.items}
-
-	for item in sales_invoice.items:
-		stock_qty = stock_levels.get(item.item_code, 0)
-		if item.qty > stock_qty:
-			insufficient_stock = True
-			error_records.append({
-				"doctype": "Amazon Failed Invoice Record",
-				"invoice_id": sales_invoice.name,
-				"error": f"Insufficient stock for item {item.item_code} as of {sales_invoice.posting_date}. "
-						f"Available: {stock_qty}, Required: {item.qty}"
-			})
-
-	# Insert all error records in batch
-	if error_records:
-		for record in error_records:
-			frappe.get_doc(record).insert()
-
-	if not insufficient_stock:
-		sales_invoice.flags.ignore_links = True
-		sales_invoice.submit()

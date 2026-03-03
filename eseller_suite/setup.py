@@ -216,7 +216,15 @@ def get_sales_order_custom_fields():
 				"read_only": 1,
 				"no_copy": 1,
 				"in_list_view":1
-			}
+			},
+			{
+				"fieldname": "fc_location",
+				"fieldtype": "Data",
+				"label": "FC Location",
+				"insert_after": "warehouse",
+				"read_only": 1,
+				"no_copy": 1,
+			},
 		]
 	}
 
