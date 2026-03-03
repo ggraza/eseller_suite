@@ -54,6 +54,7 @@ class SalesOrderOverride(SalesOrder):
 			self.amazon_order_amount =  0
 
 	def on_submit(self):
+		self.validate_warehouse()
 		super(SalesOrderOverride, self).on_submit()
 		
 		sales_invoice = make_sales_invoice(source_name=self.name, target_doc=None, ignore_permissions=True)
@@ -168,6 +169,19 @@ class SalesOrderOverride(SalesOrder):
 		if not self.amazon_order_id or self.fulfillment_channel != "AFN":
 			return
 
+		companies = frappe.db.get_all(
+			'AFN Order Shipment Log',
+			filters={'amazon_order_id': self.amazon_order_id},
+			pluck='company',
+			distinct=True
+		)
+		if len(companies)>1:
+			failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
+			failed_sync_record.amazon_order_id = self.amazon_order_id
+			failed_sync_record.remarks = 'Can not update Sales Order, Multiple companies found in shipment logs. FC-based changes cannot be processed. Please check the shipment logs for this order.'
+			failed_sync_record.save(ignore_permissions=True)
+			return
+
 		shipment_logs = frappe.db.get_all(
 			'AFN Order Shipment Log',
 			filters={'amazon_order_id': self.amazon_order_id, 'fc_processed':0},
@@ -179,10 +193,33 @@ class SalesOrderOverride(SalesOrder):
 
 		# Group logs by item_code
 		from collections import defaultdict
-		log_map = defaultdict(list)
+		# Structure:
+		# {
+		# 	'CS8502 X 2PK': [
+		# 		{'warehouse': 'DEL4', 'qty': 20.0, 'company': 'Company A', 'fc_code': 'FC1'},
+		# 		{'warehouse': 'BLR2', 'qty': 10.0, 'company': 'Company A', 'fc_code': 'FC2'},
+		# 	]
+		# }
+		# Group by item_code -> (warehouse, company, fc_code)
+		temp_map = defaultdict(lambda: defaultdict(float))
 
 		for log in shipment_logs:
-			log_map[log.item_code].append(log)
+			key = (log.warehouse, log.company, log.fc_code)
+			temp_map[log.item_code][key] += log.qty
+
+		# Convert to required structure
+		final_map = {}
+
+		for item_code, group_data in temp_map.items():
+			final_map[item_code] = []
+
+			for (warehouse, company, fc_code), qty in group_data.items():
+				final_map[item_code].append({
+					"warehouse": warehouse,
+					"company": company,
+					"fc_code": fc_code,
+					"qty": qty
+				})
 
 		has_company_change = False
 		new_items = []
@@ -192,7 +229,7 @@ class SalesOrderOverride(SalesOrder):
 				new_items.append(row)
 				continue
 
-			logs = log_map.get(row.item_code)
+			logs = final_map.get(row.item_code)
 
 			# If no matching logs → keep row as is
 			if not logs:
@@ -205,34 +242,39 @@ class SalesOrderOverride(SalesOrder):
 				if remaining_qty <= 0:
 					break
 
-				split_qty = min(remaining_qty, log.qty)
+				split_qty = min(remaining_qty, log.get("qty", 0))
 				remaining_qty -= split_qty
 
 				# Duplicate row with split qty and log values
 				new_row = row.as_dict()
+				new_row.pop("name", '')
+				new_row.pop("idx", '')
 				new_row["qty"] = split_qty
-				new_row["warehouse"] = log.warehouse
-				new_row["fc_location"] = log.fc_code
+				new_row["warehouse"] = log.get("warehouse", '')
+				new_row["fc_location"] = log.get("fc_code", '')
 				new_items.append(new_row)
 
-				# Duplicate row with split qty and log values
-				if remaining_qty > 0:
-					new_row_1 = row.as_dict()
-					new_row_1["qty"] = remaining_qty
-					new_items.append(new_row_1)
-
-				if self.company != log.company:
+				if self.company != log.get('company', ''):
 					has_company_change = True
 
 				# Update header values based on last match
-				self.company = log.company
-				self.set_warehouse = log.warehouse
-				self.fc_location = log.fc_code
+				self.company = log.get('company', self.company)
+				self.set_warehouse = log.get("warehouse", self.set_warehouse)
+				self.fc_location = log.get("fc_code", '')
+
+			# Duplicate row with split qty and log values
+			if remaining_qty > 0:
+				new_row_1 = row.as_dict()
+				new_row_1.pop("name", '')
+				new_row_1.pop("idx", '')
+				new_row_1["qty"] = remaining_qty
+				new_items.append(new_row_1)
 
 		frappe.db.set_value('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id, 'fc_processed':0}, 'fc_processed', 1)
 
 		# Clear and re-add items
 		self.set("items", [])
+		fc_location = ''
 		for d in new_items:
 			self.append("items", d)
 
@@ -397,4 +439,3 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 		doclist.set_payment_schedule()
 
 	return doclist
-
