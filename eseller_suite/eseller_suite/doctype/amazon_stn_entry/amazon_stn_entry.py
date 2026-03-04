@@ -227,8 +227,15 @@ class AmazonSTNEntry(Document):
 		return frappe.db.get_value("Company", {"gstin": gstin}, "name")
 
 	def get_item_with_asin(self, asin):
-		"""Return Item mapped to the given ASIN."""
-		return frappe.db.get_value("Item", {"amazon_item_code": asin}, "name")
+		"""
+			Return Item mapped to the given ASIN.
+			If there is actual Item Mapped, then Actual Item will be returned
+		"""
+		item_code = frappe.db.get_value("Item", {"amazon_item_code": asin}, "name")
+		if item_code:
+			if frappe.db.get_value("Item", item_code, "actual_item"):
+				item_code = frappe.db.get_value("Item", item_code, "actual_item")
+		return item_code
 
 	def map_and_update_item(self, row):
 		"""Map Item to row using ASIN and update HSN code if missing."""
