@@ -9,7 +9,6 @@ from erpnext.accounts.party import get_party_account
 from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from erpnext.stock.doctype.item.item import get_item_defaults
-from erpnext.stock.doctype.packed_item.packed_item import make_packing_list
 
 import re
 
@@ -54,7 +53,6 @@ class SalesOrderOverride(SalesOrder):
 			self.amazon_order_amount =  0
 
 	def on_submit(self):
-		self.validate_warehouse()
 		super(SalesOrderOverride, self).on_submit()
 		
 		sales_invoice = make_sales_invoice(source_name=self.name, target_doc=None, ignore_permissions=True)
@@ -280,10 +278,6 @@ class SalesOrderOverride(SalesOrder):
 
 		if has_company_change:
 			self.handle_company_changes()
-
-		# Clear and re-add packed items to trigger re-calculation based on new warehouses
-		self.packed_items = []
-		make_packing_list(self)
 
 	def handle_company_changes(self):
 		'''
