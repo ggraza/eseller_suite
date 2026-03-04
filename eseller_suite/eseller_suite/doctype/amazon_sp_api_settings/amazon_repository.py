@@ -1381,7 +1381,6 @@ class AmazonRepository:
 					return
 				else:
 					so.flags.ignore_mandatory = True
-					so.flags.ignore_validate = True
 					so.disable_rounded_total = 1
 					so.custom_validate()
 					if so.grand_total >= 0:
