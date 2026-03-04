@@ -8,8 +8,8 @@ from frappe.core.doctype.submission_queue.submission_queue import queue_submissi
 import os
 import csv
 from charset_normalizer import from_path
-
 from eseller_suite.eseller_suite.utils import add_bundle_components_to_stock_entry, get_bundle_items
+from datetime import datetime
 
 class AmazonSTNEntry(Document):
 	def submit(self):
@@ -106,10 +106,17 @@ class AmazonSTNEntry(Document):
 		if is_blank_row:
 			return
 
-		if stn_row.get("invoice_date_str"):
-			dt = get_datetime(stn_row.get("invoice_date_str"))
-			stn_row["invoice_date"] = dt.date()
-			stn_row["invoice_time"] = dt.time()
+		date_str = stn_row.get("invoice_date_str")
+		if date_str:
+			try:
+				dt = datetime.strptime(date_str.strip(), "%d/%m/%y %H:%M")
+				stn_row["invoice_date"] = dt.strftime("%Y-%m-%d")
+				stn_row["invoice_time"] = dt.strftime("%H:%M:%S")
+			except ValueError as e:
+				frappe.log_error(
+					title="Invalid Invoice Date Format",
+					message=f"Failed on: '{date_str}' | Error: {e}"
+				)
 
 		child = self.append("stn_entries", stn_row)
 		self.map_companies_and_warehouses(child)
@@ -118,7 +125,7 @@ class AmazonSTNEntry(Document):
 
 	def map_companies_and_warehouses(self, row):
 		"""Map companies and warehouses for the STN row."""
-		allowed_transaction_types = ['FC_TRANSFER', 'FC_REMOVAL']
+		allowed_transaction_types = ['FC_TRANSFER', 'FC_REMOVAL', 'FC_REMOVAL-Cancel']
 		# ToDo :: Except FC_TRANSFER
 		if row.transaction_type not in allowed_transaction_types:
 			self.add_error_log(row, f"Transaction Type with {row.transaction_type} is not handled right now.")
@@ -140,11 +147,11 @@ class AmazonSTNEntry(Document):
 		else:
 			self.add_error_log(row, f"Source Company not found for GSTIN: {row.source_gstin}")
 
-		if row.transaction_type == 'FC_REMOVAL':
+		if row.transaction_type in ['FC_REMOVAL', 'FC_REMOVAL-Cancel']:
 			main_warehouse = frappe.db.get_single_value("eSeller Settings", "main_warehouse")
 			main_company = frappe.db.get_single_value("eSeller Settings", "main_company")
 			if not main_warehouse or not main_company:
-				self.add_error_log(row, f"Main Warehouse or Main Company is not configured in eSeller Settings, It is required to process FC_REMOVAL.")
+				self.add_error_log(row, f"Main Warehouse or Main Company is not configured in eSeller Settings, It is required to process {row.transaction_type}.")
 				return
 			row.target_company = main_company
 			row.target_warehouse = main_warehouse
@@ -466,6 +473,42 @@ class AmazonSTNEntry(Document):
 				except Exception as e:
 					frappe.log_error(message=f"Failed to Cancel Purchase Invoice {row.sales_invoice} linked to STN Entry {self.name}: {str(e)}", title="Amazon STN Entry Cancel Error")
 
+	def handle_fc_removal_cancel(self, row):
+		"""
+			Cancel related documents for FC_REMOVAL - cancel transaction type.
+		"""
+		if not row.invoice_number:
+			self.add_error_log(row, "Invoice number missing for FC_REMOVAL - cancel.")
+			return
+
+		found_any = False
+		# Search for Stock Entry, Sales Invoice, Purchase Invoice with amazon_invoice_id = row.invoice_number
+		for doctype in ["Stock Entry", "Sales Invoice", "Purchase Invoice"]:
+			docs = frappe.get_all(doctype, filters={
+				"amazon_invoice_id": row.invoice_number
+			}, fields=["name", "docstatus"])
+
+			if docs:
+				found_any = True
+				for d in docs:
+					if d.docstatus == 2:
+						continue
+
+					if d.docstatus == 0:
+						self.add_error_log(row, f"{doctype} {d.name} is in draft state.")
+
+					try:
+						doc = frappe.get_doc(doctype, d.name)
+						doc.cancel()
+					except Exception as e:
+						self.add_error_log(row, f"Failed to cancel {doctype} {d.name}: {str(e)}")
+
+		if not found_any:
+			self.add_error_log(row, f"No related documents found for Invoice Number: {row.invoice_number}")
+		else:
+			frappe.db.set_value(row.doctype, row.name, "transactions_created", 1, update_modified=False)
+			row.transactions_created = 1
+
 	def create_sales_invoice(self, row):
 		"""
 			Create Sales Invoice for Source Company
@@ -718,6 +761,7 @@ class AmazonSTNEntry(Document):
 			Handle stock movement entries for rows like
 			Creating Sales/Purchase Invoices for Inter-Company Transfers.
 			Creating Stock Entries for Same Company Transfers.
+			Cancelling documents for FC_REMOVAL-Cancel transactions.
 		'''
 		stock_entry_type = frappe.db.get_value("Stock Entry Type", {"purpose": "Material Transfer"}, "name")
 		if not stock_entry_type:
@@ -726,6 +770,10 @@ class AmazonSTNEntry(Document):
 		for stn_row in self.stn_entries:
 			# Skip rows if not ready
 			if not stn_row.ready_to_process or stn_row.transactions_created:
+				continue
+
+			if stn_row.transaction_type == 'FC_REMOVAL-Cancel':
+				self.handle_fc_removal_cancel(stn_row)
 				continue
 
 			# Stock Entry for Same Company
