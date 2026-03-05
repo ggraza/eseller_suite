@@ -586,6 +586,9 @@ class AmazonSTNEntry(Document):
 			si.amazon_invoice_id = row.invoice_number
 			si.set_warehouse = row.source_warehouse
 			si.disable_rounded_total = 1
+			price_list = frappe.db.get_single_value("eSeller Settings", "inter_company_price_list")
+			if price_list:
+				si.selling_price_list = price_list
 
 			si.append("items", {
 				"item_code": row.item,
@@ -712,6 +715,9 @@ class AmazonSTNEntry(Document):
 			pi.amazon_invoice_id = row.invoice_number
 			pi.set_warehouse = row.target_warehouse
 			pi.disable_rounded_total = 1
+			price_list = frappe.db.get_single_value("eSeller Settings", "inter_company_price_list")
+			if price_list:
+				pi.buying_price_list = price_list
 
 			#Adding bundle Items to Bundle Items table
 			if frappe.db.get_value('Item', row.item, 'is_bundle_item'):
@@ -817,15 +823,25 @@ class AmazonSTNEntry(Document):
 		return 0
 
 def get_items_from_bundle(bundle):
+	price_list = frappe.db.get_single_value("eSeller Settings", "inter_company_price_list") or ""
 	populated_items = []
 	children = get_bundle_items(bundle.get('item_code')) or []
+	has_multiple_items = len(children) > 1
 	for child in children:
+		item_code = child.get("item_code")
 		qty = flt(child.get("qty")) * flt(bundle.get('qty'))
 		rate = flt(bundle.get("rate")) / flt(child.get("qty"))
 		conversion_factor = 1
 		stock_uom = child["uom"]
+		if has_multiple_items:
+			#Individual Items amount should be based on Item Price, else seting as 0
+			rate = 0
+			if price_list:
+				item_price = frappe.db.get_value("Item Price", {"item_code": item_code, "price_list": price_list}, "price_list_rate") or 0
+				if item_price:
+					rate = item_price
 		populated_items.append({
-			"item_code": child["item_code"],
+			"item_code": item_code,
 			"item_name": child["item_name"],
 			"qty": qty,
 			"uom": child["uom"],

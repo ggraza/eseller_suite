@@ -26,6 +26,14 @@ function set_filters(frm) {
 			}
 		};
 	});
+	frm.set_query("inter_company_price_list", () => {
+		return {
+			filters: {
+				"buying": 1,
+				"selling": 1,
+			}
+		};
+	});
 }
 
 /**

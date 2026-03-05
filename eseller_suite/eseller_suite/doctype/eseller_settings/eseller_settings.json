@@ -5,18 +5,20 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "stn_entry_configs_tab",
   "defaults_section",
-  "default_mode_of_payment",
-  "max_invoice_count",
-  "default_amazon_customer",
-  "column_break_psuc",
-  "default_pos_profile",
-  "amazon_stn_entry_configurations_section",
-  "allow_missing_warehouse_creation",
-  "parent_warehouses",
   "main_warehouse",
   "main_company",
-  "amazon_payment_entry_accounts_section",
+  "column_break_hkqn",
+  "inter_company_price_list",
+  "section_break_lnmo",
+  "allow_missing_warehouse_creation",
+  "parent_warehouses",
+  "amazon_payment_entry_configs_tab",
+  "max_invoice_count",
+  "column_break_dcwj",
+  "default_mode_of_payment",
+  "section_break_znhz",
   "column_break_lzak",
   "amazon_reserve_fund",
   "inventory_reimbursement_account",
@@ -28,7 +30,12 @@
   "use_reserve_lines_in_amazon_payment_entry",
   "amazon_reserve_income_account",
   "amazon_reserve_expense_account",
-  "flipkart_defaults_section",
+  "general_defaults_tab",
+  "amazon_defaults_section",
+  "default_amazon_customer",
+  "column_break_psuc",
+  "default_pos_profile",
+  "section_break_phir",
   "default_flipkart_customer",
   "column_break_qzmo",
   "default_flipkart_supplier"
@@ -37,7 +44,7 @@
   {
    "fieldname": "defaults_section",
    "fieldtype": "Section Break",
-   "label": "Amazon Defaults"
+   "label": "Defaults"
   },
   {
    "description": "This Customer will be used while creating Sales Invoices from Amazon Payment Extractor",
@@ -47,11 +54,6 @@
    "label": "Default Amazon Customer",
    "options": "Customer",
    "reqd": 1
-  },
-  {
-   "fieldname": "flipkart_defaults_section",
-   "fieldtype": "Section Break",
-   "label": "Flipkart Defaults"
   },
   {
    "description": "This Customer will be used while creating Sales Invoices from Flipkart Payment Extractor",
@@ -98,8 +100,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Amazon Reserve Fund Account",
-   "options": "Account",
-   "reqd": 1
+   "options": "Account"
   },
   {
    "default": "25",
@@ -115,8 +116,7 @@
    "fieldname": "inventory_reimbursement_account",
    "fieldtype": "Link",
    "label": "Inventory Reimbursement Expense Account",
-   "options": "Account",
-   "reqd": 1
+   "options": "Account"
   },
   {
    "depends_on": "eval: doc.use_reserve_lines_in_amazon_payment_entry",
@@ -145,50 +145,36 @@
    "fieldname": "inventory_reimbursement_income_account",
    "fieldtype": "Link",
    "label": "Inventory Reimbursement Income Account",
-   "options": "Account",
-   "reqd": 1
+   "options": "Account"
   },
   {
    "description": "This account will be used for Other Expenses",
    "fieldname": "other_expenses_account",
    "fieldtype": "Link",
    "label": "Other Expenses Account",
-   "options": "Account",
-   "reqd": 1
+   "options": "Account"
   },
   {
    "description": "This account will be used for Other Income",
    "fieldname": "other_income_account",
    "fieldtype": "Link",
    "label": "Other Income Account",
-   "options": "Account",
-   "reqd": 1
+   "options": "Account"
   },
   {
    "description": "This account will be used for Expenses against Order cancellation (will not be booked against the order)",
    "fieldname": "order_cancellation_account",
    "fieldtype": "Link",
    "label": "Order Cancellation Account",
-   "options": "Account",
-   "reqd": 1
+   "options": "Account"
   },
   {
    "fieldname": "column_break_psuc",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "amazon_payment_entry_accounts_section",
-   "fieldtype": "Section Break",
-   "label": "Amazon Payment Entry Accounts"
-  },
-  {
    "fieldname": "column_break_icux",
    "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "amazon_stn_entry_configurations_section",
-   "fieldtype": "Section Break",
-   "label": "Amazon STN Entry Configurations"
   },
   {
    "default": "0",
@@ -209,7 +195,8 @@
    "fieldname": "main_warehouse",
    "fieldtype": "Link",
    "label": "Main Warehouse",
-   "options": "Warehouse"
+   "options": "Warehouse",
+   "reqd": 1
   },
   {
    "description": "Company of Main Warehouse",
@@ -219,13 +206,63 @@
    "label": "Main Company",
    "options": "Company",
    "read_only": 1
+  },
+  {
+   "fieldname": "general_defaults_tab",
+   "fieldtype": "Tab Break",
+   "label": "General Defaults"
+  },
+  {
+   "fieldname": "section_break_lnmo",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Price list used for inter-company sales and purchase invoice creation",
+   "fieldname": "inter_company_price_list",
+   "fieldtype": "Link",
+   "label": "Inter Company Price List",
+   "options": "Price List",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_znhz",
+   "fieldtype": "Section Break",
+   "label": "Default Accounts"
+  },
+  {
+   "fieldname": "section_break_phir",
+   "fieldtype": "Section Break",
+   "label": "Flipkart Defaults"
+  },
+  {
+   "fieldname": "stn_entry_configs_tab",
+   "fieldtype": "Tab Break",
+   "label": "STN Entry Configs"
+  },
+  {
+   "fieldname": "amazon_payment_entry_configs_tab",
+   "fieldtype": "Tab Break",
+   "label": "Amazon Payment Entry Configs"
+  },
+  {
+   "fieldname": "amazon_defaults_section",
+   "fieldtype": "Section Break",
+   "label": "Amazon Defaults"
+  },
+  {
+   "fieldname": "column_break_hkqn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_dcwj",
+   "fieldtype": "Column Break"
   }
  ],
  "hide_toolbar": 1,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-02-26 11:07:25.088712",
+ "modified": "2026-03-05 12:56:21.924151",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "eSeller Settings",
