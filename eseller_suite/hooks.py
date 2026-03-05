@@ -193,8 +193,10 @@ scheduler_events = {
 # ------------------------------
 #
 override_whitelisted_methods = {
-	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "eseller_suite.eseller_suite.custom_script.sales_order.sales_order.make_sales_invoice"
+	"erpnext.selling.doctype.sales_order.sales_order.make_sales_invoice": "eseller_suite.eseller_suite.custom_script.sales_order.sales_order.make_sales_invoice",
+	"erpnext.controllers.queries.item_query": "eseller_suite.eseller_suite.queries.custom_item_query"
 }
+
 #
 # each overriding function accepts a `data` argument;
 # generated from the base implementation of the doctype dashboard,

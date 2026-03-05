@@ -523,11 +523,15 @@ class AmazonRepository:
 
 	def get_item_code(self, order_item, order_id) -> str:
 		item_code = None
-		if frappe.db.exists("Item", {"amazon_item_code": order_item["ASIN"]}):
-			return frappe.db.get_value("Item", {"amazon_item_code": order_item["ASIN"]})
+		item_asin = order_item.get("ASIN", '')
+		if frappe.db.exists("Item", {"amazon_item_code": item_asin}):
+			item_code = frappe.db.get_value("Item", {"amazon_item_code": item_asin})
+			if frappe.db.get_value("Item", item_code, "actual_item"):
+				item_code = frappe.db.get_value("Item", item_code, "actual_item")
+			return item_code
 		if not self.amz_setting.create_item_if_not_exists:
 			# Record failed sync attempt
-			error_message = f"Failed to create Sales Order against Amazon Order ID : {order_id}. Item with ASIN : {order_item.get('ASIN')} and SKU {order_item.get('SellerSKU')} not found."
+			error_message = f"Failed to create Sales Order against Amazon Order ID : {order_id}. Item with ASIN : {order_item.get('ASIN')} and SKU : {order_item.get('SellerSKU')} not found."
 			if not frappe.db.exists("Amazon Failed Sync Record", { "amazon_order_id": order_id, "remarks":error_message }):
 				failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
 				failed_sync_record.amazon_order_id = order_id
@@ -564,6 +568,7 @@ class AmazonRepository:
 
 		final_order_items = []
 		warehouse = self.amz_setting.warehouse
+		default_stock_uom = frappe.db.get_single_value("Stock Settings", "stock_uom") or "Nos"
 
 		while True:
 			order_items_list = order_items_payload.get("OrderItems")
@@ -608,8 +613,8 @@ class AmazonRepository:
 						"qty": item_qty,
 						"amount": item_rate * item_qty,
 						"base_amount": item_rate * item_qty,
-						"uom": "Nos",
-						"stock_uom": "Nos",
+						"uom": default_stock_uom,
+						"stock_uom": default_stock_uom,
 						"warehouse": warehouse,
 						"conversion_factor": 1.0,
 						"allow_zero_valuation_rate": 1,
@@ -820,12 +825,10 @@ class AmazonRepository:
 							)
 
 							item_code = None
-							if asin and frappe.db.exists(
-								"Item", {"amazon_item_code": asin}
-							):
-								item_code = frappe.db.get_value(
-									"Item", {"amazon_item_code": asin}
-								)
+							if asin and frappe.db.exists("Item", {"amazon_item_code": asin}):
+								item_code = frappe.db.get_value("Item", {"amazon_item_code": asin})
+								if frappe.db.get_value("Item", item_code, "actual_item"):
+									item_code = frappe.db.get_value("Item", item_code, "actual_item")
 
 							for charge in charges:
 								charge_type = charge.get("ChargeType")
@@ -1430,9 +1433,7 @@ class AmazonRepository:
 
 				# Ensure HSN code is set from Item master if not already present
 				if not item.get("gst_hsn_code") and item.get("item_code"):
-					item_hsn_code = frappe.db.get_value(
-						"Item", item.get("item_code"), "gst_hsn_code"
-					)
+					item_hsn_code = frappe.db.get_value("Item", item.get("item_code"), "gst_hsn_code")
 					if item_hsn_code:
 						item["gst_hsn_code"] = item_hsn_code
 

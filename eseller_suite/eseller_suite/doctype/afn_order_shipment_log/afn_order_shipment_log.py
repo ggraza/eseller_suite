@@ -26,7 +26,10 @@ class AFNOrderShipmentLog(Document):
 		#Setting Item
 		if self.merchant_sku and not self.item_code:
 			if frappe.db.exists('Item', self.merchant_sku):
-				self.item_code = self.merchant_sku
+				item_code = self.merchant_sku
+				if frappe.db.get_value('Item', self.merchant_sku, 'actual_item'):
+					item_code = frappe.db.get_value('Item', self.merchant_sku, 'actual_item')
+				self.item_code = item_code
 			else:
 				exception_msg = f"Item not found with SKU : {self.merchant_sku}"
 				self.add_exceptions(exception_msg)
