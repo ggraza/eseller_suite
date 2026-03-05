@@ -10,14 +10,11 @@ def before_save(doc, method):
 	set_bundle_diff_amount(doc)
 	set_discount_based_on_amazon_value(doc)
 
-def before_submit(doc, method):
-	doc.custom_ready_to_submit = 1
-
 def on_submit(doc, method):
 	'''
 		Method which trigger on on_submit event of Purchase Invoice
 	'''
-	if doc.bundle_difference_amount:
+	if doc.bundle_difference_amount >=1 or doc.bundle_difference_amount <= -1:
 		title = 'Check Difference Amount'
 		msg = 'Cannot submit the invoice due to difference amount of {0} for bundle items'.format(frappe.bold(doc.bundle_difference_amount))
 		frappe.throw(
