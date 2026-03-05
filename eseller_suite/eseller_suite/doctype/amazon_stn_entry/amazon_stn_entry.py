@@ -796,9 +796,6 @@ class AmazonSTNEntry(Document):
 				# For Inter-Company Transfers, create Sales and Purchase Invoices
 				self.create_sales_invoice(stn_row)
 				self.create_purchase_invoice(stn_row)
-				if stn_row.sales_invoice and stn_row.purchase_invoice:
-					frappe.db.set_value("Sales Invoice", stn_row.sales_invoice, "inter_company_invoice_reference", stn_row.purchase_invoice, update_modified=False)
-					frappe.db.set_value("Purchase Invoice", stn_row.purchase_invoice, "inter_company_invoice_reference", stn_row.sales_invoice, update_modified=False)
 				frappe.db.set_value(stn_row.doctype, stn_row.name, "transactions_created", 1, update_modified=False)
 		submit_transactions(self.name)
 
@@ -892,11 +889,15 @@ def submit_transactions(stn_entry_name):
 
 				# Submiting Sales Invoice with exception handling
 				if stn_row.sales_invoice:
+					if stn_row.purchase_invoice:
+						frappe.db.set_value('Sales Invoice', stn_row.sales_invoice, "inter_company_invoice_reference", stn_row.purchase_invoice, update_modified=False)
 					frappe.db.savepoint("before_si_submit")
 					try:
 						si_doc = frappe.get_doc('Sales Invoice', stn_row.sales_invoice)
 						if si_doc.docstatus == 0:
 							si_doc.discount_amount = 0 #To trigger discount calculation
+							if stn_row.purchase_invoice:
+								si_doc.inter_company_invoice_reference = stn_row.purchase_invoice
 							si_doc.save(ignore_permissions=True)
 							si_doc.submit()
 					except Exception as e:
@@ -908,6 +909,8 @@ def submit_transactions(stn_entry_name):
 
 				# Submiting Purchase Invoice with exception handling
 				if stn_row.purchase_invoice:
+					if stn_row.sales_invoice:
+						frappe.db.set_value('Purchase Invoice', stn_row.purchase_invoice, "inter_company_invoice_reference", stn_row.sales_invoice, update_modified=False)
 					frappe.db.savepoint("before_pi_submit")
 					try:
 						pi_doc = frappe.get_doc('Purchase Invoice', stn_row.purchase_invoice)
