@@ -796,6 +796,9 @@ class AmazonSTNEntry(Document):
 				# For Inter-Company Transfers, create Sales and Purchase Invoices
 				self.create_sales_invoice(stn_row)
 				self.create_purchase_invoice(stn_row)
+				if stn_row.sales_invoice and stn_row.purchase_invoice:
+					frappe.db.set_value("Sales Invoice", stn_row.sales_invoice, "inter_company_invoice_reference", stn_row.purchase_invoice, update_modified=False)
+					frappe.db.set_value("Purchase Invoice", stn_row.purchase_invoice, "inter_company_invoice_reference", stn_row.sales_invoice, update_modified=False)
 				frappe.db.set_value(stn_row.doctype, stn_row.name, "transactions_created", 1, update_modified=False)
 		submit_transactions(self.name)
 

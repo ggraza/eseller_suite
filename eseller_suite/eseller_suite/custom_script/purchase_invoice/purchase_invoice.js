@@ -10,6 +10,7 @@ frappe.ui.form.on("Purchase Invoice", {
 				}
 			};
 		});
+		manage_custom_buttons(frm);
 	}
 });
 
@@ -76,4 +77,14 @@ function apply_bundle_items(frm, cdt, cdn) {
 			frm.refresh_field("items");
 		}
 	});
+}
+
+function manage_custom_buttons(frm) {
+	if (frm.doc.amazon_invoice_id) {
+			if (frm.doc.inter_company_invoice_reference) {
+				frm.add_custom_button(__('Inter-Company Sales Invoice'), () => {
+					frappe.set_route('Form', 'Sales Invoice', frm.doc.inter_company_invoice_reference);
+				}, __('View'));
+			}
+	}
 }

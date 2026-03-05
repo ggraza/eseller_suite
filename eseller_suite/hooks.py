@@ -33,6 +33,7 @@ doctype_js = {
 	"Item" : "eseller_suite/custom_script/item/item.js",
 	"Stock Entry" : "eseller_suite/custom_script/stock_entry/stock_entry.js",
 	"Purchase Invoice" : "eseller_suite/custom_script/purchase_invoice/purchase_invoice.js",
+	"Sales Invoice" : "eseller_suite/custom_script/sales_invoice/sales_invoice.js",
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
