@@ -122,6 +122,7 @@ class AmazonSTNEntry(Document):
 		self.map_companies_and_warehouses(child)
 		self.map_and_update_item(child)
 		self.set_ready_to_process(child)
+		self.check_duplicate_stn_entry(child)
 
 	def map_companies_and_warehouses(self, row):
 		"""Map companies and warehouses for the STN row."""
@@ -768,6 +769,29 @@ class AmazonSTNEntry(Document):
 				exception_msg = f"{row.error_log}\n{exception_msg}"
 			frappe.db.set_value(row.doctype, row.name, "error_log", exception_msg, update_modified=False)
 			self.add_error_log(row, exception_msg)
+
+	def check_duplicate_stn_entry(self, row):
+		"""
+			Check if the row is already processed in any other STN entry.
+			Match by Invoice Number, ASIN, Transaction Type, and Transaction ID.
+			If duplicate exists, set transaction references and mark transactions_created as 1.
+		"""
+		duplicate_row = frappe.db.get_value("Amazon STN Entry Item", {
+			"invoice_number": row.invoice_number,
+			"asin": row.asin,
+			"transaction_type": row.transaction_type,
+			"transaction_id": row.transaction_id,
+			"transactions_created": 1,
+			"name": ["!=", row.name]
+		}, ["name", "sales_invoice", "purchase_invoice", "stock_entry"], as_dict=True)
+
+		if duplicate_row:
+			row.sales_invoice = duplicate_row.sales_invoice
+			row.purchase_invoice = duplicate_row.purchase_invoice
+			row.stock_entry = duplicate_row.stock_entry
+			row.ready_to_process = 1
+			row.transactions_created = 1
+			row.error_log = f"Duplicate row detected. References copied from {duplicate_row.name}."
 
 	def handle_stock_movement_entries(self):
 		'''

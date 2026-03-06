@@ -309,7 +309,8 @@ def get_sales_invoice_custom_fields():
 				"label": "Amazon Invoice Value",
 				"read_only": 1,
 				"insert_after": "amazon_invoice_id",
-				"no_copy": 1
+				"no_copy": 1,
+				"depends_on": 'eval: doc.amazon_invoice_id',
 			},
 		],
 		"Sales Invoice Item": [
@@ -443,7 +444,8 @@ def get_purchase_invoice_custom_fields():
 				"label": "Amazon Invoice Value",
 				"read_only": 1,
 				"insert_after": "amazon_invoice_id",
-				"no_copy": 1
+				"no_copy": 1,
+				"depends_on": 'eval: doc.amazon_invoice_id',
 			},
 			{
 				"fieldname": "bundle_items",
@@ -667,7 +669,8 @@ def get_stock_entry_custom_fields():
 				"label": "Amazon Invoice Value",
 				"read_only": 1,
 				"insert_after": "amazon_invoice_id",
-				"no_copy": 1
+				"no_copy": 1,
+				"depends_on": 'eval: doc.amazon_invoice_id',
 			},
 			{
 				"fieldname": "bundle_items",
