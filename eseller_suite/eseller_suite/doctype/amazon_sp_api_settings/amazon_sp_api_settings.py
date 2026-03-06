@@ -457,14 +457,21 @@ class AmazonSPAPISettings(Document):
 
 	@frappe.whitelist()
 	def create_report(self, report_type, from_date=None, to_date=None):
+		'''
+			Method to create report via SP APIS
+			from_date and to_date will be based on IST
+			IST to UTC conversion is handled
+		'''
 		if not from_date:
-			from_date = today()
+			from_date = add_days(getdate(), -1)
 		if not to_date:
 			to_date = today()
+		from_date = add_days(getdate(from_date), -1)	# Subtract 1 day for IST to UTC conversion
+		to_date = add_days(getdate(to_date), -1)	# Subtract 1 day for IST to UTC conversion
 		from_date_str = getdate(from_date).strftime("%Y-%m-%d")
-		from_date_str_tz = f"{from_date_str}T00:00:00Z"
+		from_date_str_tz = f"{from_date_str}T18:30:00Z"	# Convert to UTC by subtracting 1 day and setting time to 18:30:00 (which is 00:00:00 IST)
 		to_date_str = getdate(to_date).strftime("%Y-%m-%d")
-		to_date_str_tz = f"{to_date_str}T23:59:59Z"
+		to_date_str_tz = f"{to_date_str}T18:30:00Z"	# Convert to UTC by subtracting 1 day and setting time to 18:30:00 (which is 00:00:00 IST)
 		if not self.is_active:
 			frappe.throw(_("Please enable the Amazon SP API Settings first."))
 
