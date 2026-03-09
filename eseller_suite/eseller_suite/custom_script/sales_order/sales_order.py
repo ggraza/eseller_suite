@@ -182,7 +182,7 @@ class SalesOrderOverride(SalesOrder):
 
 		shipment_logs = frappe.db.get_all(
 			'AFN Order Shipment Log',
-			filters={'amazon_order_id': self.amazon_order_id, 'fc_processed':0},
+			filters={'amazon_order_id': self.amazon_order_id, 'fc_processed':0, 'has_exceptions':0 },
 			fields=['fc_code', 'item_code', 'warehouse', 'company', 'qty']
 		)
 
@@ -268,7 +268,7 @@ class SalesOrderOverride(SalesOrder):
 				new_row_1["qty"] = remaining_qty
 				new_items.append(new_row_1)
 
-		frappe.db.set_value('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id, 'fc_processed':0}, 'fc_processed', 1)
+		frappe.db.set_value('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id, 'fc_processed':0, 'has_exceptions':0}, 'fc_processed', 1)
 
 		# Clear and re-add items
 		self.set("items", [])
