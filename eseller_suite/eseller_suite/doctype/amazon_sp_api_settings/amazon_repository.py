@@ -4,6 +4,7 @@
 
 import json
 import time
+import re
 
 import dateutil
 import frappe
@@ -21,6 +22,8 @@ from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_se
 	AmazonSPAPISettings,
 )
 from frappe.utils import getdate, add_days, get_datetime
+
+from eseller_suite.eseller_suite.custom_script.sales_order.sales_order import get_account_head
 
 
 class AmazonRepository:
@@ -1165,24 +1168,18 @@ class AmazonRepository:
 						)
 						return_si.set_posting_time = 1
 				except Exception as e:
-					frappe.log_error(
-						f"Error setting posting date for return invoice: {str(e)}"
-					)
+					frappe.log_error(f"Error setting posting date for return invoice: {str(e)}")
 
 				return_si.is_return = 1
 				return_si.update_stock = 1
 				return_si.return_against = si
-				return_si.customer = frappe.db.get_value(
-					"Sales Invoice", si, "customer"
-				)
-				return_warehouse = frappe.db.get_value(
-					"Sales Invoice", si, "set_warehouse"
-				)
+				return_si.customer = frappe.db.get_value("Sales Invoice", si, "customer")
+				return_si.company = frappe.db.get_value("Sales Invoice", si, "company")
+				return_si.debit_to = frappe.db.get_value("Sales Invoice", si, "debit_to")
+				return_warehouse = frappe.db.get_value("Sales Invoice", si, "set_warehouse")
 				if self.amz_setting.temporary_stock_transfer_required:
 					return_warehouse = self.amz_setting.warehouse
-					si_fulfilement_channel = frappe.db.get_value(
-						"Sales Invoice", si, "fulfillment_channel"
-					)
+					si_fulfilement_channel = frappe.db.get_value("Sales Invoice", si, "fulfillment_channel")
 					if si_fulfilement_channel:
 						if si_fulfilement_channel == "AFN":
 							return_warehouse = self.amz_setting.afn_warehouse
@@ -1199,9 +1196,7 @@ class AmazonRepository:
 					if not item.get("item_code"):
 						continue
 
-					actual_item = frappe.db.get_value(
-						"Item", item.get("item_code"), "actual_item"
-					)
+					actual_item = frappe.db.get_value("Item", item.get("item_code"), "actual_item")
 					if not actual_item:
 						actual_item = item.get("item_code")
 
@@ -1306,6 +1301,14 @@ class AmazonRepository:
 
 			# Only insert and submit if items were created
 			if return_created and len(return_si.items) > 0:
+				company_abr, default_cc = frappe.db.get_value('Company', return_si.company, ['abbr', 'cost_center'])
+				for row in return_si.taxes:
+					if row.cost_center:
+						current_cc = row.cost_center
+						new_cc = re.sub(r"-[^-]*$", f"- {company_abr}", current_cc)
+						row.cost_center = new_cc if frappe.db.exists('Cost Center', new_cc) else default_cc
+					if row.account_head:
+						row.account_head = get_account_head(row.account_head, return_si.company)
 				try:
 					return_si.insert(ignore_permissions=True)
 					return_si.submit()
