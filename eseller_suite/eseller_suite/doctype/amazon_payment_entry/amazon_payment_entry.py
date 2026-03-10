@@ -18,9 +18,9 @@ from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repositor
 class AmazonPaymentEntry(Document):
 	def before_save(self):
 		'''
-  		Method to check if the return sales invoice is already cancelled
+		Method to check if the return sales invoice is already cancelled
 		and remove it from the payment details table
-  		'''
+		'''
 		for row in self.payment_details:
 			if row.return_sales_invoice:
 				if frappe.db.get_value('Sales Invoice', row.return_sales_invoice, 'docstatus') == 2:
@@ -96,9 +96,9 @@ class AmazonPaymentEntry(Document):
 				if internal_key == "date":
 					value = self.parse_date(value)
 				payment_detail[internal_key] = value
-		if not is_blank_row and  payment_detail.get('transaction_type'):
+		if not is_blank_row and payment_detail.get('transaction_type'):
 			self.append("payment_details", payment_detail)
-	
+
 	@frappe.whitelist()
 	def fetch_invoice_details(self):
 		'''
@@ -197,7 +197,7 @@ class AmazonPaymentEntry(Document):
 		if has_changes:
 			self.save()
 		return 1
-	
+
 	@frappe.whitelist()
 	def create_journal_entry(self):
 		'''
@@ -228,6 +228,9 @@ class AmazonPaymentEntry(Document):
 				sales_invoice_ref = False
 				if row.sales_invoice:
 					sales_invoice_ref = row.sales_invoice
+					if frappe.db.get_value('Sales Invoice', sales_invoice_ref, 'debit_to'):
+						jv_row.account = frappe.db.get_value('Sales Invoice', sales_invoice_ref, 'debit_to')
+
 				if row.return_sales_invoice:
 					sales_invoice_ref = row.return_sales_invoice
 				if sales_invoice_ref:
@@ -276,8 +279,6 @@ class AmazonPaymentEntry(Document):
 				if row.customer:
 					reserve_jv_row.party_type = 'Customer'
 					reserve_jv_row.party = row.customer
-
-
 
 		difference_amount = total_debit-total_credit
 		jv_row = jv_doc.append('accounts')

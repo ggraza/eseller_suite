@@ -174,10 +174,12 @@ class SalesOrderOverride(SalesOrder):
 			distinct=True
 		)
 		if len(companies)>1:
-			failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
-			failed_sync_record.amazon_order_id = self.amazon_order_id
-			failed_sync_record.remarks = 'Can not update Sales Order, Multiple companies found in shipment logs. FC-based changes cannot be processed. Please check the shipment logs for this order.'
-			failed_sync_record.save(ignore_permissions=True)
+			remarks = 'Can not update Sales Order, Multiple companies found in shipment logs. FC-based changes cannot be processed. Please check the shipment logs for this order.'
+			if not frappe.db.exists('Amazon Failed Sync Record', {'amazon_order_id': self.amazon_order_id, 'remarks': remarks}):
+				failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
+				failed_sync_record.amazon_order_id = self.amazon_order_id
+				failed_sync_record.remarks = remarks
+				failed_sync_record.save(ignore_permissions=True)
 			return
 
 		shipment_logs = frappe.db.get_all(

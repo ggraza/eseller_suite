@@ -22,7 +22,7 @@ class AmazonFailedSyncRecord(Document):
 						# Verify that a Sales Order or Sales Invoice exists for this amazon_order_id
 						so_exists = frappe.db.exists("Sales Order", {"amazon_order_id": self.amazon_order_id})
 						si_exists = frappe.db.exists("Sales Invoice", {"amazon_order_id": self.amazon_order_id})
-						
+
 						if so_exists or si_exists:
 							# Order/Invoice created successfully, delete the failed sync record
 							record_name = self.name
