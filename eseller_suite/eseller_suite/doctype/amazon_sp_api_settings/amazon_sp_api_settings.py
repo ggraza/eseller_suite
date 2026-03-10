@@ -582,11 +582,30 @@ def enq_si_submit_doc(sales_invoice):
 		error_records = []
 
 		# Collect stock levels for all items first (Assumption: Bulk fetching is possible)
-		stock_levels = {item.item_code: get_stock_balance(item.item_code, item.warehouse, sales_invoice.posting_date)
-						for item in sales_invoice.items}
+		stock_levels = {
+			item.item_code: get_stock_balance(
+				item.item_code,
+				item.warehouse,
+				sales_invoice.posting_date
+			)
+			for item in [*sales_invoice.items, *sales_invoice.packed_items]
+			if frappe.db.get_value("Item", item.item_code, "is_stock_item")
+		}
 
 		for item in sales_invoice.items:
-			stock_qty = stock_levels.get(item.item_code, 0)
+			if frappe.db.get_value("Item", item.item_code, "is_stock_item"):
+				stock_qty = stock_levels.get(item.item_code, 0)
+				if item.qty > stock_qty:
+					insufficient_stock = True
+					error_records.append({
+						"doctype": "Amazon Failed Invoice Record",
+						"invoice_id": sales_invoice.name,
+						"error": f"Insufficient stock for item {item.item_code} as of {sales_invoice.posting_date}. "
+								f"Available: {stock_qty}, Required: {item.qty}"
+					})
+
+		for item in sales_invoice.packed_items:
+			stock_qty = stock_levels.get(item.parent_item, 0)
 			if item.qty > stock_qty:
 				insufficient_stock = True
 				error_records.append({
