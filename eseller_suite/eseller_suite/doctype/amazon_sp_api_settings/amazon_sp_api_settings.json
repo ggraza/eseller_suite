@@ -33,6 +33,7 @@
   "sync_selected_date_only",
   "sync_orders",
   "fc_based_invoice_creation",
+  "fc_exception_tag",
   "column_break_4",
   "enable_sync",
   "max_retry_limit",
@@ -283,10 +284,18 @@
    "fieldname": "fc_based_invoice_creation",
    "fieldtype": "Check",
    "label": "FC Based Invoice Creation"
+  },
+  {
+   "depends_on": "fc_based_invoice_creation",
+   "description": "This tag will be added to Sales Order, If it contains multiple Companies.",
+   "fieldname": "fc_exception_tag",
+   "fieldtype": "Link",
+   "label": "FC Exception Tag",
+   "options": "Tag"
   }
  ],
  "links": [],
- "modified": "2026-02-20 10:33:32.551297",
+ "modified": "2026-03-12 14:09:55.674760",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon SP API Settings",

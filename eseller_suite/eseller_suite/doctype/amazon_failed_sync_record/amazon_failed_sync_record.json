@@ -9,6 +9,7 @@
   "replaced_order_id",
   "amazon_order_amount",
   "grand_total",
+  "is_multi_company_exception",
   "column_break_bmhr",
   "amazon_order_date",
   "posting_date",
@@ -96,12 +97,18 @@
   {
    "fieldname": "column_break_jcoe",
    "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_multi_company_exception",
+   "fieldtype": "Check",
+   "label": "Is Multi Company Exception"
   }
  ],
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-11-12 15:21:26.641545",
+ "modified": "2026-03-12 14:23:15.266446",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon Failed Sync Record",
@@ -120,6 +127,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

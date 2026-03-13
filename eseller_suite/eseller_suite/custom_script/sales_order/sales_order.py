@@ -3,6 +3,7 @@ from frappe import _
 from frappe.utils import cint, flt
 from frappe.model.mapper import get_mapped_doc
 from frappe.model.utils import get_fetch_values
+from frappe.desk.doctype.tag.tag import add_tag
 from frappe.contacts.doctype.address.address import get_company_address
 
 from erpnext.accounts.party import get_party_account
@@ -173,12 +174,22 @@ class SalesOrderOverride(SalesOrder):
 			pluck='company',
 			distinct=True
 		)
+
+		# Getting Tag for Multi Company Exception
+		fc_exception_tag = None
+		amz_setting = frappe.db.exists("Amazon SP API Settings", {"is_active":1})
+		if amz_setting:
+			fc_exception_tag = frappe.db.get_value("Amazon SP API Settings", amz_setting, "fc_exception_tag")
+
 		if len(companies)>1:
+			if fc_exception_tag:
+				add_tag(fc_exception_tag, self.doctype, self.name)
 			remarks = 'Can not update Sales Order, Multiple companies found in shipment logs. FC-based changes cannot be processed. Please check the shipment logs for this order.'
 			if not frappe.db.exists('Amazon Failed Sync Record', {'amazon_order_id': self.amazon_order_id, 'remarks': remarks}):
 				failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
 				failed_sync_record.amazon_order_id = self.amazon_order_id
 				failed_sync_record.remarks = remarks
+				failed_sync_record.is_multi_company_exception = 1
 				failed_sync_record.save(ignore_permissions=True)
 			return
 
