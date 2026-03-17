@@ -32,12 +32,6 @@ class AmazonPaymentEntry(Document):
 	def validate(self):
 		if not self.payment_details:
 			self.process_payment_data()
-		if not self.amazon_reserve_fund_account:
-			amazon_reserve_fund = frappe.db.get_single_value('eSeller Settings', 'amazon_reserve_fund')
-			if amazon_reserve_fund:
-				self.amazon_reserve_fund_account = amazon_reserve_fund
-			else:
-				frappe.throw('Please configure the `Default Amazon Customer` in {0}'.format(get_link_to_form('eSeller Settings', 'eSeller Settings')))
 
 	def on_submit(self):
 		frappe.db.set_value(self.doctype, self.name, 'in_progress', 1)
@@ -111,6 +105,7 @@ class AmazonPaymentEntry(Document):
 			if not row.ready_to_process:
 				i += 1
 				frappe.publish_realtime("fetch_invoice_details", dict(progress=i, total=len(total_pending_count)))
+				row.company = self.company
 				if row.order_id and row.transaction_type in ['Order Payment', 'Amazon Easy Ship Charges', 'Fulfillment Fee Refund', 'Refund', 'Other']:
 					invoice_details = get_invoice_details(row.order_id, is_return=0)
 					return_invoice_details = None
@@ -119,6 +114,9 @@ class AmazonPaymentEntry(Document):
 						is_return = True
 						return_invoice_details = get_invoice_details(row.order_id, is_return=1)
 					if invoice_details.get('sales_invoice'):
+						company = frappe.db.get_value('Sales Invoice', invoice_details.get('sales_invoice'), 'company')
+						if company:
+							row.company = company
 						row.sales_invoice = invoice_details.get('sales_invoice')
 					if invoice_details.get('customer'):
 						row.customer = invoice_details.get('customer')
@@ -156,44 +154,46 @@ class AmazonPaymentEntry(Document):
 								has_changes = True
 				if row.transaction_type in ['Other', 'Inventory Reimbursement'] and row.product_details in ['FBA Inventory Reimbursement', 'FBA Reversed Reimbursement'] and row.order_id == '---':
 					if float(row.total) < 0:
-						inventory_reimbursement_account = frappe.db.get_single_value('eSeller Settings', 'inventory_reimbursement_account')
+						inventory_reimbursement_account = get_account_based_on_company(row.company, 'inventory_reimbursement_account')
 						if inventory_reimbursement_account:
 							row.ready_to_process = 1
 							row.amazon_expense_account = inventory_reimbursement_account
 							has_changes = True
 					elif float(row.total) > 0:
-						inventory_reimbursement_income_account = frappe.db.get_single_value('eSeller Settings', 'inventory_reimbursement_income_account')
+						inventory_reimbursement_income_account = get_account_based_on_company(row.company, 'inventory_reimbursement_income_account')
 						if inventory_reimbursement_income_account:
 							row.ready_to_process = 1
 							row.amazon_expense_account = inventory_reimbursement_income_account
 							has_changes = True
 				if row.transaction_type == 'Inventory Reimbursement' and row.product_details == 'FBA Inventory Reimbursement' and row.order_id:
 					if float(row.total) > 0:
-						inventory_reimbursement_income_account = frappe.db.get_single_value('eSeller Settings', 'inventory_reimbursement_income_account')
+						inventory_reimbursement_income_account = get_account_based_on_company(row.company, 'inventory_reimbursement_income_account')
 						if inventory_reimbursement_income_account:
 							row.ready_to_process = 1
 							row.amazon_expense_account = inventory_reimbursement_income_account
 							has_changes = True
 				if row.transaction_type == 'Other' and row.product_details == 'Others' and row.order_id == '---':
 					if float(row.total) < 0:
-						other_expenses_account = frappe.db.get_single_value('eSeller Settings', 'other_expenses_account')
+						other_expenses_account = get_account_based_on_company(row.company, 'other_expenses_account')
 						if other_expenses_account:
 							row.ready_to_process = 1
 							row.amazon_expense_account = other_expenses_account
 							has_changes = True
 					elif float(row.total) > 0:
-						other_income_account = frappe.db.get_single_value('eSeller Settings', 'other_income_account')
+						other_income_account = get_account_based_on_company(row.company, 'other_income_account')
 						if other_income_account:
 							row.ready_to_process = 1
 							row.amazon_expense_account = other_income_account
 							has_changes = True
 				if row.transaction_type.strip() == 'Cancellation' and row.product_details == 'Order Cancellation Charge' and row.total and row.order_id:
 					if float(row.total) < 0:
-						order_cancellation_account = frappe.db.get_single_value('eSeller Settings', 'order_cancellation_account')
+						order_cancellation_account = get_account_based_on_company(row.company, 'order_cancellation_account')
 						if order_cancellation_account:
 							row.ready_to_process = 1
 							row.amazon_expense_account = order_cancellation_account
 							has_changes = True
+				if row.amazon_expense_account:
+					row.company = frappe.db.get_value('Account', row.amazon_expense_account, 'company')
 		if has_changes:
 			self.save()
 		return 1
@@ -201,98 +201,147 @@ class AmazonPaymentEntry(Document):
 	@frappe.whitelist()
 	def create_journal_entry(self):
 		'''
-			Method to create Journal Entry against payment details table row
+		Method to create Journal Entry against payment details table row.
+		Creates a separate JV for each company found in payment_details.
 		'''
-		jv_doc = frappe.new_doc('Journal Entry')
-		jv_doc.voucher_type = 'Journal Entry'
-		jv_doc.posting_date = self.posting_date
-		jv_doc.cheque_date = self.posting_date
-		jv_doc.cheque_no = self.name
-		jv_doc.title = self.name
-		total_debit = 0
-		total_credit = 0
+		# Group payment_details rows by company
+		company_rows = {}
 		for row in self.payment_details:
-			if row.ready_to_process and row.total:
-				if row.total == 0:
-					continue
-				jv_row = jv_doc.append('accounts')
-				if row.transaction_type in ["Previous statement's unavailable balance", "Unavailable balance"]:
-					jv_row.account = self.amazon_reserve_fund_account
-					jv_row.user_remark = row.product_details
-				if row.order_id:
-					jv_row.amazon_order_id = row.order_id
-				if row.customer:
-					jv_row.party_type = 'Customer'
-					jv_row.party = row.customer
-					jv_row.account = self.default_receivable_account
-				sales_invoice_ref = False
-				if row.sales_invoice:
-					sales_invoice_ref = row.sales_invoice
-					if frappe.db.get_value('Sales Invoice', sales_invoice_ref, 'debit_to'):
-						jv_row.account = frappe.db.get_value('Sales Invoice', sales_invoice_ref, 'debit_to')
+			if row.ready_to_process and row.company and row.total:
+				company = row.get("company")
+				if company not in company_rows:
+					company_rows[company] = []
+				company_rows[company].append(row)
 
-				if row.return_sales_invoice:
-					sales_invoice_ref = row.return_sales_invoice
-				if sales_invoice_ref:
-					jv_row.reference_type = 'Sales Invoice'
-					outstanding_amount = float(frappe.db.get_value('Sales Invoice', sales_invoice_ref, 'outstanding_amount'))
-					if outstanding_amount >= abs(float(row.total)):
-						jv_row.reference_name = sales_invoice_ref
-					else:
-						remarks = 'Invoice outstanding_amount = {0}'.format(outstanding_amount)
-						jv_row.user_remark = remarks
-				if row.journal_entry:
-					jv_row.reference_type = ''
-					jv_row.reference_name = ''
-				if row.amazon_expense_account:
-					if row.amazon_service_type:
-						jv_row.user_remark = row.amazon_service_type
-					else:
+		created_jvs = []
+
+		for company, rows in company_rows.items():
+			jv_doc = frappe.new_doc('Journal Entry')
+			jv_doc.voucher_type = 'Journal Entry'
+			jv_doc.company = company
+			jv_doc.posting_date = self.posting_date
+			jv_doc.cheque_date = self.posting_date
+			jv_doc.cheque_no = self.name
+			jv_doc.title = "{0} - {1}".format(self.name, company)
+
+			total_debit = 0
+			total_credit = 0
+
+			for row in rows:
+				if row.ready_to_process and row.total:
+					jv_row = jv_doc.append('accounts')
+
+					if row.transaction_type in ["Previous statement's unavailable balance", "Unavailable balance"]:
+						jv_row.account = get_account_based_on_company(company, 'amazon_reserve_fund_account')
 						jv_row.user_remark = row.product_details
-					jv_row.account = row.amazon_expense_account
 
-				if float(row.total) > 0:
-					jv_row.credit = abs(float(row.total))
-					jv_row.credit_in_account_currency = abs(float(row.total))
-					total_credit += abs(float(row.total))
-				else:
-					jv_row.debit = abs(float(row.total))
-					jv_row.debit_in_account_currency = abs(float(row.total))
-					total_debit += abs(float(row.total))
-				if not jv_row.get("account", None) and not jv_row.get("party", None):
-					frappe.throw("Please re-fetch due to missing account or party in row # {0}".format(row.idx))
-			elif frappe.db.get_single_value("eSeller Settings", "use_reserve_lines_in_amazon_payment_entry"):
-				reserve_jv_row = jv_doc.append('accounts')
-				reserve_jv_row.user_remark = row.product_details
-				if float(row.total) > 0:
-					reserve_jv_row.account = frappe.db.get_single_value("eSeller Settings", "amazon_reserve_income_account")
-					reserve_jv_row.credit = abs(float(row.total))
-					reserve_jv_row.credit_in_account_currency = abs(float(row.total))
-					total_credit += abs(float(row.total))
-				else:
-					reserve_jv_row.account = frappe.db.get_single_value("eSeller Settings", "amazon_reserve_expense_account")
-					reserve_jv_row.debit = abs(float(row.total))
-					reserve_jv_row.debit_in_account_currency = abs(float(row.total))
-					total_debit += abs(float(row.total))
-				if row.order_id:
-					reserve_jv_row.amazon_order_id = row.order_id
-				if row.customer:
-					reserve_jv_row.party_type = 'Customer'
-					reserve_jv_row.party = row.customer
+					if row.order_id:
+						jv_row.amazon_order_id = row.order_id
 
-		difference_amount = total_debit-total_credit
-		jv_row = jv_doc.append('accounts')
-		jv_row.account = self.payment_account
-		if difference_amount>0:
-			jv_row.credit = difference_amount
-			jv_row.credit_in_account_currency = difference_amount
-		else:
-			jv_row.debit = abs(difference_amount)
-			jv_row.debit_in_account_currency = abs(difference_amount)
-		jv_doc.flags.ignore_mandatory = True
-		jv_doc.save(ignore_permissions=True)
-		jv_doc.submit()
-		frappe.msgprint('Journal Entry Created: <a href="{0}">{1}</a>'.format(get_url_to_form(jv_doc.doctype, jv_doc.name), jv_doc.name), alert=True, indicator='green')
+					if row.customer:
+						jv_row.party_type = 'Customer'
+						jv_row.party = row.customer
+						jv_row.account = self.default_receivable_account
+
+					sales_invoice_ref = False
+					if row.sales_invoice:
+						sales_invoice_ref = row.sales_invoice
+						if frappe.db.get_value('Sales Invoice', sales_invoice_ref, 'debit_to'):
+							jv_row.account = frappe.db.get_value('Sales Invoice', sales_invoice_ref, 'debit_to')
+
+					if row.return_sales_invoice:
+						sales_invoice_ref = row.return_sales_invoice
+
+					if sales_invoice_ref:
+						jv_row.reference_type = 'Sales Invoice'
+						outstanding_amount = float(frappe.db.get_value('Sales Invoice', sales_invoice_ref, 'outstanding_amount'))
+						if outstanding_amount >= abs(float(row.total)):
+							jv_row.reference_name = sales_invoice_ref
+						else:
+							jv_row.user_remark = 'Invoice outstanding_amount = {0}'.format(outstanding_amount)
+
+					if row.journal_entry:
+						jv_row.reference_type = ''
+						jv_row.reference_name = ''
+
+					if row.amazon_expense_account:
+						jv_row.user_remark = row.amazon_service_type if row.amazon_service_type else row.product_details
+						jv_row.account = row.amazon_expense_account
+
+					if float(row.total) > 0:
+						jv_row.credit = abs(float(row.total))
+						jv_row.credit_in_account_currency = abs(float(row.total))
+						total_credit += abs(float(row.total))
+					else:
+						jv_row.debit = abs(float(row.total))
+						jv_row.debit_in_account_currency = abs(float(row.total))
+						total_debit += abs(float(row.total))
+
+					if not jv_row.get("account", None) and not jv_row.get("party", None):
+						frappe.throw("Please re-fetch due to missing account or party in row # {0}".format(row.idx))
+
+				elif frappe.db.get_single_value("eSeller Settings", "use_reserve_lines_in_amazon_payment_entry"):
+					reserve_jv_row = jv_doc.append('accounts')
+					reserve_jv_row.user_remark = row.product_details
+
+					if float(row.total) > 0:
+						amazon_reserve_income_account = get_account_based_on_company(company, 'amazon_reserve_income_account')
+						if not amazon_reserve_income_account:
+							frappe.throw("Please set Amazon Reserve Income Account for company {0} in eSeller Settings".format(company))
+						reserve_jv_row.account = amazon_reserve_income_account
+						reserve_jv_row.credit = abs(float(row.total))
+						reserve_jv_row.credit_in_account_currency = abs(float(row.total))
+						total_credit += abs(float(row.total))
+					else:
+						amazon_reserve_expense_account = get_account_based_on_company(company, 'amazon_reserve_expense_account')
+						if not amazon_reserve_expense_account:
+							frappe.throw("Please set Amazon Reserve Expense Account for company {0} in eSeller Settings".format(company))
+						reserve_jv_row.account = amazon_reserve_expense_account
+						reserve_jv_row.debit = abs(float(row.total))
+						reserve_jv_row.debit_in_account_currency = abs(float(row.total))
+						total_debit += abs(float(row.total))
+
+					if row.order_id:
+						reserve_jv_row.amazon_order_id = row.order_id
+					if row.customer:
+						reserve_jv_row.party_type = 'Customer'
+						reserve_jv_row.party = row.customer
+
+			# Add balancing payment account row
+			difference_amount = total_debit - total_credit
+			if difference_amount:
+				payment_account = get_account_based_on_company(company, 'mop_account')
+				if not payment_account:
+					# Getting default Bank Account
+					payment_account = frappe.db.get_value('Company', company, 'default_bank_account')
+				if not payment_account:
+					# Getting default Cash account
+					payment_account = frappe.db.get_value('Company', company, 'default_cash_account')
+				if payment_account:
+					jv_row = jv_doc.append('accounts')
+					jv_row.account = payment_account
+					if difference_amount > 0:
+						jv_row.credit = difference_amount
+						jv_row.credit_in_account_currency = difference_amount
+					else:
+						jv_row.debit = abs(difference_amount)
+						jv_row.debit_in_account_currency = abs(difference_amount)
+			if total_debit or total_credit:
+				jv_doc.flags.ignore_mandatory = True
+				jv_doc.save(ignore_permissions=True)
+				jv_doc.submit()
+				created_jvs.append(jv_doc)
+
+		# Show success message with links to all created JVs
+		links = ", ".join([
+			'<a href="{0}">{1}</a>'.format(get_url_to_form(jv.doctype, jv.name), jv.name)
+			for jv in created_jvs
+		])
+		frappe.msgprint(
+			'Journal Entries Created: {0}'.format(links),
+			alert=True,
+			indicator='green'
+		)
 
 	@frappe.whitelist()
 	def get_missing_sales_orders(self):
@@ -318,9 +367,12 @@ class AmazonPaymentEntry(Document):
 	def unset_ready_to_process(self):
 		'''Method to uncheck ready to process for all the rows in the payment details table'''
 		for row in self.payment_details:
-			if row.ready_to_process:
-				row.ready_to_process = 0
-				row.return_sales_invoice = ''
+			row.ready_to_process = 0
+			row.sales_invoice = ''
+			row.return_sales_invoice = ''
+			row.company = ''
+			row.amazon_expense_account = ''
+			row.customer = ''
 		self.save()
 
 def get_invoice_details(amazon_order_id, is_return=0):
@@ -351,3 +403,19 @@ def get_replaced_jv(amazon_order_id):
 	if frappe.db.exists('Journal Entry', { 'docstatus':1, 'amazon_order_id':amazon_order_id }):
 		jv_reference = frappe.db.get_value('Journal Entry', { 'docstatus':1, 'amazon_order_id':amazon_order_id })
 	return jv_reference
+
+def get_account_based_on_company(company, account_type):
+	account = None
+	account_types = [
+		'amazon_reserve_fund_account',
+		'amazon_reserve_income_account',
+		'amazon_reserve_expense_account',
+		'inventory_reimbursement_account',
+		'inventory_reimbursement_income_account',
+		'other_expenses_account',
+		'other_income_account',
+		'order_cancellation_account'
+	]
+	if account_type in account_types:
+		account = frappe.db.get_value('Amazon Payment Account', { 'company': company, 'parent': 'eSeller Settings', }, account_type)
+	return account

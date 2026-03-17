@@ -9,14 +9,12 @@
  "field_order": [
   "payment_file",
   "mode_of_payment",
-  "payment_account",
   "in_progress",
   "reset_progress",
   "column_break_isbj",
   "posting_date",
   "company",
   "default_receivable_account",
-  "amazon_reserve_fund_account",
   "fetch_customizations_section",
   "remaining_refunds_have_no_returns",
   "payment_details_section",
@@ -70,14 +68,6 @@
    "reqd": 1
   },
   {
-   "fieldname": "payment_account",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Payment Account",
-   "options": "Account",
-   "read_only": 1
-  },
-  {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
@@ -94,14 +84,6 @@
    "fieldtype": "Link",
    "hidden": 1,
    "label": "Default Receivable Account",
-   "options": "Account",
-   "read_only": 1
-  },
-  {
-   "fieldname": "amazon_reserve_fund_account",
-   "fieldtype": "Link",
-   "hidden": 1,
-   "label": "Amazon Reserve Fund Account",
    "options": "Account",
    "read_only": 1
   },
@@ -142,11 +124,11 @@
    "link_fieldname": "cheque_no"
   }
  ],
- "modified": "2025-06-05 15:16:47.819889",
+ "modified": "2026-03-17 16:16:18.810631",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon Payment Entry",
- "naming_rule": "Expression (old style)",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

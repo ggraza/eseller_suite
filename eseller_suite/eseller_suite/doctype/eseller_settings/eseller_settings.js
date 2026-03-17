@@ -3,11 +3,7 @@
 
 frappe.ui.form.on("eSeller Settings", {
 	refresh(frm) {
-		set_filters(frm)
-		set_parent_warehouse_query(frm);
-	},
-	onload(frm) {
-		set_parent_warehouse_query(frm);
+		set_filters(frm);
 	},
 	allow_missing_warehouse_creation(frm) {
 		if (frm.doc.allow_missing_warehouse_creation) {
@@ -16,6 +12,20 @@ frappe.ui.form.on("eSeller Settings", {
 			clear_parent_warehouses(frm);
 		}
 	}
+});
+
+frappe.ui.form.on("Amazon Payment Account", {
+	payment_accounts_add(frm, cdt, cdn) {
+		frappe.model.set_value(cdt, cdn, 'company', '');
+		frappe.model.set_value(cdt, cdn, 'mode_of_payment', frm.doc.default_mode_of_payment);
+		frappe.model.set_value(cdt, cdn, 'use_reserve_lines_in_amazon_payment_entry', frm.doc.use_reserve_lines_in_amazon_payment_entry);
+	},
+});
+
+frappe.ui.form.on("eSeller Parent Warehouse", {
+	parent_warehouses_add(frm, cdt, cdn) {
+		frappe.model.set_value(cdt, cdn, 'company', '');
+	},
 });
 
 function set_filters(frm) {
@@ -34,15 +44,7 @@ function set_filters(frm) {
 			}
 		};
 	});
-}
-
-/**
- * Apply filter for parent warehouse based on company and is_group
- */
-function set_parent_warehouse_query(frm) {
-	if (!frm.fields_dict.parent_warehouses) return;
-
-	frm.fields_dict.parent_warehouses.grid.get_field("default_parent_warehouse").get_query = function (doc, cdt, cdn) {
+	frm.set_query('default_parent_warehouse', 'parent_warehouses', (doc, cdt, cdn) => {
 		let row = locals[cdt][cdn];
 		return {
 			filters: {
@@ -50,7 +52,8 @@ function set_parent_warehouse_query(frm) {
 				is_group: 1
 			}
 		};
-	};
+	});
+	default_account_filters(frm);
 }
 
 /**
@@ -80,4 +83,79 @@ function populate_parent_warehouses(frm) {
 function clear_parent_warehouses(frm) {
 	frm.clear_table("parent_warehouses");
 	frm.refresh_field("parent_warehouses");
+}
+
+function default_account_filters(frm) {
+	frm.set_query('inventory_reimbursement_income_account', 'payment_accounts', (doc, cdt, cdn) => {
+		let row = locals[cdt][cdn];
+		return {
+			filters: {
+				company: row.company || "",
+				is_group: 0
+			}
+		};
+	});
+	frm.set_query('other_income_account', 'payment_accounts', (doc, cdt, cdn) => {
+		let row = locals[cdt][cdn];
+		return {
+			filters: {
+				company: row.company || "",
+				is_group: 0
+			}
+		};
+	});
+	frm.set_query('amazon_reserve_fund_account', 'payment_accounts', (doc, cdt, cdn) => {
+		let row = locals[cdt][cdn];
+		return {
+			filters: {
+				company: row.company || "",
+				is_group: 0
+			}
+		};
+	});
+	frm.set_query('inventory_reimbursement_account', 'payment_accounts', (doc, cdt, cdn) => {
+		let row = locals[cdt][cdn];
+		return {
+			filters: {
+				company: row.company || "",
+				is_group: 0
+			}
+		};
+	});
+	frm.set_query('other_expenses_account', 'payment_accounts', (doc, cdt, cdn) => {
+		let row = locals[cdt][cdn];
+		return {
+			filters: {
+				company: row.company || "",
+				is_group: 0
+			}
+		};
+	});
+	frm.set_query('order_cancellation_account', 'payment_accounts', (doc, cdt, cdn) => {
+		let row = locals[cdt][cdn];
+		return {
+			filters: {
+				company: row.company || "",
+				is_group: 0
+			}
+		};
+	});
+	frm.set_query('amazon_reserve_income_account', 'payment_accounts', (doc, cdt, cdn) => {
+		let row = locals[cdt][cdn];
+		return {
+			filters: {
+				company: row.company || "",
+				is_group: 0
+			}
+		};
+	});
+	frm.set_query('amazon_reserve_expense_account', 'payment_accounts', (doc, cdt, cdn) => {
+		let row = locals[cdt][cdn];
+		return {
+			filters: {
+				company: row.company || "",
+				is_group: 0
+			}
+		};
+	});
 }
