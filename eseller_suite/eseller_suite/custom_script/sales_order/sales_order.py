@@ -183,7 +183,9 @@ class SalesOrderOverride(SalesOrder):
 
 		if len(companies)>1:
 			if fc_exception_tag:
-				add_tag(fc_exception_tag, self.doctype, self.name)
+				#Check for document existance as it's called in validate
+				if frappe.db.exists(self.doctype, self.name):
+					add_tag(fc_exception_tag, self.doctype, self.name)
 			remarks = 'Can not update Sales Order, Multiple companies found in shipment logs. FC-based changes cannot be processed. Please check the shipment logs for this order.'
 			if not frappe.db.exists('Amazon Failed Sync Record', {'amazon_order_id': self.amazon_order_id, 'remarks': remarks}):
 				failed_sync_record = frappe.new_doc("Amazon Failed Sync Record")
