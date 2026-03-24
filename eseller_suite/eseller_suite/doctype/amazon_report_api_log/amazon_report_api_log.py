@@ -127,7 +127,6 @@ def get_report_url(report_log_id):
 
 	report_document_id = frappe.db.get_value("Amazon Report API Log", report_log_id, "report_document_id")
 	if not report_document_id:
-		frappe.log_error(title="Report Document ID Not Found", message=f"Report Document ID not found for Report Log {report_log_id}.")
 		return
 
 	amz_settings = frappe.get_all(
