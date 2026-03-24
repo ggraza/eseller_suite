@@ -52,6 +52,7 @@ class SalesOrderOverride(SalesOrder):
 			self.amazon_order_amount =  0
 		if self.amazon_order_status == 'Canceled' or self.replaced_order_id:
 			self.amazon_order_amount =  0
+		self.set_has_multi_company_exception_flag()
 
 	def on_submit(self):
 		super(SalesOrderOverride, self).on_submit()
@@ -165,7 +166,7 @@ class SalesOrderOverride(SalesOrder):
 			Handle FC-based warehouse & company changes.
 			Supports multiple logs per item_code (qty split across warehouses).
 		"""
-		if not self.amazon_order_id or self.fulfillment_channel != "AFN":
+		if not self.amazon_order_id or self.fulfillment_channel != "AFN" or self.ignore_fc_changes:
 			return
 
 		companies = frappe.db.get_all(
@@ -333,6 +334,17 @@ class SalesOrderOverride(SalesOrder):
 				else:
 					frappe.db.set_value('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id}, 'order_created', 1, update_modified=False)
 
+	def set_has_multi_company_exception_flag(self):
+		'''
+			Method to set multi company flag in case of multiple companies in shipment logs
+		'''
+		amz_setting = frappe.db.exists("Amazon SP API Settings", {"is_active":1})
+		if amz_setting:
+			fc_exception_tag = frappe.db.get_value("Amazon SP API Settings", amz_setting, "fc_exception_tag")
+			if fc_exception_tag:
+				if frappe.db.exists('Tag Link', { 'document_type':self.doctype, 'document_name': self.name, 'tag': fc_exception_tag}):
+					self.has_multi_company_exception = 1
+
 def get_account_head(current_acc, company):
 	'''
 		Get account head based on company
@@ -448,3 +460,112 @@ def make_sales_invoice(source_name, target_doc=None, ignore_permissions=False):
 		doclist.set_payment_schedule()
 
 	return doclist
+
+@frappe.whitelist()
+def split_so_based_on_company(sales_order):
+	'''
+		Splits the sales order based on company in case of FC orders with multiple companies in shipment logs
+	'''
+	if frappe.db.exists("Sales Order", sales_order):
+		so_list = []
+		so_doc = frappe.get_doc("Sales Order", sales_order)
+		companies = frappe.db.get_all(
+			'AFN Order Shipment Log',
+			filters={'amazon_order_id': so_doc.amazon_order_id},
+			pluck='company',
+			distinct=True
+		)
+		for company in companies:
+			warehouse = None
+			new_so_doc = frappe.new_doc("Sales Order")
+			new_so_doc.update(so_doc.as_dict())
+			new_so_doc.items = []
+			new_so_doc.taxes = []
+
+			shipment_logs = frappe.db.get_all(
+				'AFN Order Shipment Log',
+				filters={'amazon_order_id': so_doc.amazon_order_id, 'has_exceptions': 0, 'company': company},
+				fields=['fc_code', 'item_code', 'warehouse', 'company', 'qty']
+			)
+
+			# Build a consumption map: item_code -> list of {warehouse, fc_code, remaining_qty}
+			# This handles the case where the same item ships from multiple warehouses
+			log_consumption = {}
+			for log in shipment_logs:
+				item_map = log_consumption.setdefault(log.item_code, {})
+				if log.warehouse in item_map:
+					item_map[log.warehouse]["remaining_qty"] += log.qty
+				else:
+					item_map[log.warehouse] = {
+						"warehouse": log.warehouse,
+						"fc_code": log.fc_code,
+						"remaining_qty": log.qty
+					}
+
+			# Convert inner dict to list for downstream compatibility
+			log_consumption = {
+				item_code: list(warehouse_map.values())
+				for item_code, warehouse_map in log_consumption.items()
+			}
+
+			amazon_promotion_discount = 0
+			for item in so_doc.items:
+				item_code = item.item_code
+				if item_code not in log_consumption:
+					continue
+
+				remaining_item_qty = item.qty  # total qty to fulfil for this SO item row
+
+				for slot in log_consumption[item_code]:
+					if slot["remaining_qty"] <= 0 or remaining_item_qty <= 0:
+						continue
+
+					# How much can this warehouse slot fulfil?
+					fulfil_qty = min(slot["remaining_qty"], remaining_item_qty)
+
+					new_item = item.as_dict()
+					new_item.pop("name", "")
+					new_item.pop("idx", "")
+					new_item["qty"] = fulfil_qty
+					new_item["warehouse"] = slot["warehouse"]
+					new_item["fc_location"] = slot["fc_code"]
+
+					# Scale discount proportionally to the fulfilled qty
+					item_discount = new_item.get("amazon_promotion_discount", 0)
+					scaled_discount = (item_discount / item.qty) * fulfil_qty if item.qty else 0
+					new_item["amazon_promotion_discount"] = scaled_discount
+
+					new_so_doc.append("items", new_item)
+					warehouse = slot["warehouse"]
+					amazon_promotion_discount += scaled_discount
+
+					for tax in so_doc.taxes:
+						new_tax = tax.as_dict()
+						if item.amazon_order_item_id == new_tax.amazon_order_item_id:
+							new_tax.pop("name", "")
+							new_tax.pop("idx", "")
+							new_so_doc.append("taxes", new_tax)
+
+					# Deduct from both ends
+					slot["remaining_qty"] -= fulfil_qty
+					remaining_item_qty -= fulfil_qty
+
+			new_so_doc.company = company
+			new_so_doc.set_warehouse = warehouse if warehouse else so_doc.set_warehouse
+			new_so_doc.amazon_order_amount = 0
+			new_so_doc.discount_amount = amazon_promotion_discount
+			new_so_doc.has_muhas_multi_company_exception = 0
+			new_so_doc.ignore_fc_changes = 1
+			new_so_doc.handle_company_changes()
+			new_so_doc.insert(ignore_permissions=True)
+			new_so_doc.submit()
+			so_list.append(new_so_doc.name)
+
+		frappe.db.delete("Sales Order", sales_order)
+		frappe.db.delete("Amazon Failed Sync Record", {"amazon_order_id": so_doc.amazon_order_id})
+		frappe.msgprint(
+			_("Sales Order has been split into : {0}".format(", ".join(so_list))),
+			alert=1,
+			indicator="green"
+		)
+		return so_list

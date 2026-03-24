@@ -220,11 +220,13 @@ class AmazonRepository:
 			principal_amounts = {}
 			promotion_discount = 0
 			seller_sku = ""
+			order_item_id = ""
 			for shipment_event in shipment_event_list:
 				if shipment_event:
 					for shipment_item in shipment_event.get("ShipmentItemList", []):
 						promotion_list = shipment_item.get("PromotionList", [])
 						seller_sku = shipment_item.get("SellerSKU")
+						order_item_id = shipment_item.get("OrderItemId", "")
 						qty = shipment_item.get("QuantityShipped")
 						charges = shipment_item.get("ItemChargeList", [])
 						fees = shipment_item.get("ItemFeeList", [])
@@ -247,6 +249,7 @@ class AmazonRepository:
 										"account_head": charge_account,
 										"tax_amount": amount,
 										"description": f"{charge_type} for {seller_sku if seller_sku else order_id}",
+										"amazon_order_item_id":order_item_id,
 									}
 								)
 							if charge_type == "Principal":
@@ -266,6 +269,7 @@ class AmazonRepository:
 										"account_head": fee_account,
 										"tax_amount": amount,
 										"description": f"{fee_type} for {seller_sku if seller_sku else order_id}",
+										"amazon_order_item_id":order_item_id,
 									}
 								)
 
@@ -282,6 +286,7 @@ class AmazonRepository:
 										"account_head": tds_account,
 										"tax_amount": amount,
 										"description": f"{tds_type} for {seller_sku if seller_sku else order_id}",
+										"amazon_order_item_id":order_item_id,
 									}
 								)
 
@@ -309,6 +314,7 @@ class AmazonRepository:
 									"account_head": fee_account,
 									"tax_amount": amount,
 									"description": f"{fee_type} for {seller_sku if seller_sku else order_id}",
+									"amazon_order_item_id":order_item_id,
 								}
 							)
 
@@ -586,7 +592,7 @@ class AmazonRepository:
 					)
 					item_tax = float(order_item.get("ItemTax", {}).get("Amount", 0))
 					# shipping_price = float(order_item.get("ShippingPrice", {}).get("Amount", 0))
-					# shipping_discount = float(order_item.get("ShippingDiscount", {}).get("Amount", 0))
+					shipping_discount = float(order_item.get("ShippingDiscount", {}).get("Amount", 0))
 					total_order_value = item_amount + item_tax
 					item_qty = float(order_item.get("QuantityOrdered", 0))
 					# In case of Cancelled orders Qty will be 0, Invoice will not get created
@@ -607,6 +613,9 @@ class AmazonRepository:
 						"Item", item_code, "gst_hsn_code"
 					)
 
+					amazon_promotion_discount = float(order_item.get("PromotionDiscount", {}).get("Amount", 0))
+					amazon_promotion_discount += shipping_discount
+
 					order_item_dict = {
 						"item_code": item_code,
 						"item_name": order_item.get("SellerSKU"),
@@ -624,6 +633,8 @@ class AmazonRepository:
 						"total_order_value": total_order_value,
 						"zero_qty_flag": zero_qty_flag,
 						"actual_qty": actual_qty,
+						"amazon_promotion_discount": amazon_promotion_discount,
+						"amazon_order_item_id": order_item.get("OrderItemId"),
 					}
 
 					# Add HSN code if available

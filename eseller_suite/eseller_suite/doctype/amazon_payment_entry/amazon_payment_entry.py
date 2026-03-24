@@ -107,12 +107,12 @@ class AmazonPaymentEntry(Document):
 				frappe.publish_realtime("fetch_invoice_details", dict(progress=i, total=len(total_pending_count)))
 				row.company = self.company
 				if row.order_id and row.transaction_type in ['Order Payment', 'Amazon Easy Ship Charges', 'Fulfillment Fee Refund', 'Refund', 'Other']:
-					invoice_details = get_invoice_details(row.order_id, is_return=0)
+					invoice_details = get_invoice_details(row.order_id, is_return=0, amount=row.total)
 					return_invoice_details = None
 					is_return = False
 					if row.transaction_type in ['Fulfillment Fee Refund', 'Refund'] or row.product_details == 'Weight Handling Fees Reversal':
 						is_return = True
-						return_invoice_details = get_invoice_details(row.order_id, is_return=1)
+						return_invoice_details = get_invoice_details(row.order_id, is_return=1, amount=row.total)
 					if invoice_details.get('sales_invoice'):
 						company = frappe.db.get_value('Sales Invoice', invoice_details.get('sales_invoice'), 'company')
 						if company:
@@ -375,12 +375,15 @@ class AmazonPaymentEntry(Document):
 			row.customer = ''
 		self.save()
 
-def get_invoice_details(amazon_order_id, is_return=0):
+def get_invoice_details(amazon_order_id, is_return=0, amount=0):
 	'''
 		This method will return the Invoice ID and Customer
 	'''
 	invoice_details = {}
 	si = frappe.db.exists('Sales Invoice', {'amazon_order_id':amazon_order_id, 'is_return':is_return, 'docstatus':1})
+	si_list = frappe.db.get_all('Sales Invoice', {'amazon_order_id':amazon_order_id, 'is_return':is_return, 'docstatus':1})
+	if len(si_list)>1:
+		si = frappe.db.get_value('Sales Invoice', {'amazon_order_id':amazon_order_id, 'is_return':is_return, 'docstatus':1, 'grand_total': amount})
 	if si:
 		customer = frappe.db.get_value('Sales Invoice', si, 'customer')
 		invoice_details['sales_invoice'] = si
