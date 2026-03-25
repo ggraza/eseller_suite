@@ -206,6 +206,24 @@ def get_sales_order_custom_fields():
 				"read_only": 1,
 				"no_copy": 1,
 			},
+			{
+				"fieldname": "has_multi_company_exception",
+				"fieldtype": "Check",
+				"label": "Has Multi Company Exception",
+				"insert_after": "temporary_stock_tranfer_id",
+				"read_only": 1,
+				"no_copy": 1,
+				"hidden": 1
+			},
+			{
+				"fieldname": "ignore_fc_changes",
+				"fieldtype": "Check",
+				"label": "Ignore FC Changes",
+				"insert_after": "has_multi_company_exception",
+				"read_only": 1,
+				"no_copy": 1,
+				"hidden": 1
+			},
 		],
 		"Sales Order Item": [
 			{
@@ -222,6 +240,32 @@ def get_sales_order_custom_fields():
 				"fieldtype": "Data",
 				"label": "FC Location",
 				"insert_after": "warehouse",
+				"read_only": 1,
+				"no_copy": 1,
+			},
+			{
+				"fieldname": "amazon_promotion_discount",
+				"fieldtype": "Currency",
+				"label": "Amazon Promotion Discount",
+				"insert_after": "total_order_value",
+				"read_only": 1,
+				"no_copy": 1,
+			},
+			{
+				"fieldname": "amazon_order_item_id",
+				"fieldtype": "Data",
+				"label": "Amazon Order Item ID",
+				"insert_after": "item_code",
+				"read_only": 1,
+				"no_copy": 1,
+			},
+		],
+		"Sales Taxes and Charges": [
+			{
+				"fieldname": "amazon_order_item_id",
+				"fieldtype": "Data",
+				"label": "Amazon Order Item ID",
+				"insert_after": "description",
 				"read_only": 1,
 				"no_copy": 1,
 			},
