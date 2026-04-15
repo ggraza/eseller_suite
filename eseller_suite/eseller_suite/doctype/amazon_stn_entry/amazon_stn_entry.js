@@ -21,7 +21,7 @@ function set_introduction_texts(frm) {
 	if (frm.doc.docstatus === 0) {
 		frm.set_intro('');
 		if (frm.doc.ready_to_process) {
-			frm.set_intro('Please set the value of description', 'green');
+			frm.set_intro('STN Entry is ready to submit', 'green');
 		}
 		else {
 			frm.set_intro(
