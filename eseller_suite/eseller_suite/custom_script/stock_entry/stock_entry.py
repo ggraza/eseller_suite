@@ -1,7 +1,9 @@
-import frappe
 import json
+
+import frappe
 from frappe.model import _
 from frappe.model.base_document import flt
+
 
 def validate(doc, method):
 	'''
@@ -60,7 +62,7 @@ def before_insert_custom(doc, method=None):
 			for row in doc.items:
 				row.t_warehouse = return_warehouse
 
-def on_canel(doc, method):
+def on_cancel(doc, method):
 	doc.ignore_linked_doctypes = (
 		"GL Entry",
 		"Stock Ledger Entry",
@@ -144,18 +146,36 @@ def process_bundle_items(bundle_items):
 		Method processes the bundle items in the stock entry and updates the amounts
 	"""
 	data = []
-	bundle_items = json.loads(bundle_items)
+	bundle_items = json.loads(bundle_items or "[]")
+
 	for item in bundle_items:
-		bundle_data = get_bundle_items(item.get('item_code'))
+		item_code = item.get("item_code")
+		parent_qty = flt(item.get("qty"))
+		parent_rate = flt(item.get("basic_rate"))
+
+		if not item_code or parent_qty <= 0:
+			continue
+
+		bundle_data = get_bundle_items(item_code)
+
 		for bundle_item in bundle_data:
-			bundle_qty = bundle_item.get('qty') or 1
-			bundle_item['qty'] = item.get('qty') * bundle_qty
-			bundle_item['transfer_qty'] = item.get('qty') * bundle_qty
-			bundle_item['rate'] = item.get('basic_rate')/bundle_qty if item.get('basic_rate') else 0
-			bundle_item['basic_rate'] = item.get('basic_rate')/bundle_qty if item.get('basic_rate') else 0
-			bundle_item['s_warehouse'] = item.get('s_warehouse')
-			bundle_item['t_warehouse'] = item.get('t_warehouse')
-			bundle_item['bundle_parent'] = item.get('name')
-			bundle_item['expense_account'] = item.get('expense_account')
+			component_qty = flt(bundle_item.get("qty")) or 1
+
+			total_qty = parent_qty * component_qty
+			unit_rate = parent_rate / component_qty if component_qty else 0
+
+			bundle_item.update({
+				"qty": total_qty,
+				"transfer_qty": total_qty,
+				"rate": unit_rate,
+				"basic_rate": unit_rate,
+				"s_warehouse": item.get("s_warehouse"),
+				"t_warehouse": item.get("t_warehouse"),
+				"bundle_parent": item.get("name"),
+				"expense_account": item.get("expense_account"),
+				"from_bundle_item": 1
+			})
+
 		data.extend(bundle_data)
+
 	return data
