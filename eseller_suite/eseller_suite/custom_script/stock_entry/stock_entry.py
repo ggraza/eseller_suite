@@ -133,7 +133,8 @@ def get_bundle_items(bundle_item):
 			"uom": item_details.stock_uom,
 			"rate": item_details.standard_rate if item_details else 0,
 			"description": row.description,
-			"conversion_factor": 1
+			"conversion_factor": 1,
+			"from_bundle_item": 1
 		})
 	return result
 
