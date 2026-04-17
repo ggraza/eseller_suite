@@ -141,7 +141,7 @@ def get_bundle_items(bundle_item):
 	return result
 
 @frappe.whitelist()
-def process_bundle_items(bundle_items):
+def process_bundle_items(bundle_items, from_warehouse=None, to_warehouse=None):
 	"""
 		Method processes the bundle items in the stock entry and updates the amounts
 	"""
@@ -169,8 +169,8 @@ def process_bundle_items(bundle_items):
 				"transfer_qty": total_qty,
 				"rate": unit_rate,
 				"basic_rate": unit_rate,
-				"s_warehouse": item.get("s_warehouse"),
-				"t_warehouse": item.get("t_warehouse"),
+				"s_warehouse": item.get("s_warehouse") or from_warehouse,
+				"t_warehouse": item.get("t_warehouse") or to_warehouse,
 				"bundle_parent": item.get("name"),
 				"expense_account": item.get("expense_account"),
 				"from_bundle_item": 1
