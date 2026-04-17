@@ -1,4 +1,5 @@
 import frappe
+import json
 from frappe.model import _
 from frappe.model.base_document import flt
 
@@ -131,7 +132,29 @@ def get_bundle_items(bundle_item):
 			"qty": flt(row.qty),
 			"uom": item_details.stock_uom,
 			"rate": item_details.standard_rate if item_details else 0,
-			"description": row.description
+			"description": row.description,
+			"conversion_factor": 1
 		})
 	return result
 
+@frappe.whitelist()
+def process_bundle_items(bundle_items):
+	"""
+		Method processes the bundle items in the stock entry and updates the amounts
+	"""
+	data = []
+	bundle_items = json.loads(bundle_items)
+	for item in bundle_items:
+		bundle_data = get_bundle_items(item.get('item_code'))
+		for bundle_item in bundle_data:
+			bundle_qty = bundle_item.get('qty') or 1
+			bundle_item['qty'] = item.get('qty') * bundle_qty
+			bundle_item['transfer_qty'] = item.get('qty') * bundle_qty
+			bundle_item['rate'] = item.get('basic_rate')/bundle_qty if item.get('basic_rate') else 0
+			bundle_item['basic_rate'] = item.get('basic_rate')/bundle_qty if item.get('basic_rate') else 0
+			bundle_item['s_warehouse'] = item.get('s_warehouse')
+			bundle_item['t_warehouse'] = item.get('t_warehouse')
+			bundle_item['bundle_parent'] = item.get('name')
+			bundle_item['expense_account'] = item.get('expense_account')
+		data.extend(bundle_data)
+	return data
