@@ -64,65 +64,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Tools",
-   "link_count": 5,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Amazon STN Entry",
-   "link_count": 0,
-   "link_to": "Amazon STN Entry",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Amazon Payment Entry",
-   "link_count": 0,
-   "link_to": "Amazon Payment Entry",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "AFN Order Shipment Entry",
-   "link_count": 0,
-   "link_to": "AFN Order Shipment Entry",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Flipkart Payment Extractor",
-   "link_count": 0,
-   "link_to": "Flipkart Payment Extractor",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Amazon Payment Extractor",
-   "link_count": 0,
-   "link_to": "Amazon Payment Extractor",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Logs",
    "link_count": 4,
    "link_type": "DocType",
@@ -168,9 +109,58 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Tools",
+   "link_count": 4,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Amazon STN Entry",
+   "link_count": 0,
+   "link_to": "Amazon STN Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Amazon Payment Entry",
+   "link_count": 0,
+   "link_to": "Amazon Payment Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AFN Order Shipment Entry",
+   "link_count": 0,
+   "link_to": "AFN Order Shipment Entry",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Flipkart Payment Extractor",
+   "link_count": 0,
+   "link_to": "Flipkart Payment Extractor",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-02-18 12:52:50.654581",
+ "modified": "2026-04-22 11:11:33.936980",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "eSeller Suite",
