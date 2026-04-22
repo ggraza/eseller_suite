@@ -554,7 +554,7 @@ def split_so_based_on_company(sales_order):
 			new_so_doc.set_warehouse = warehouse if warehouse else so_doc.set_warehouse
 			new_so_doc.amazon_order_amount = 0
 			new_so_doc.discount_amount = amazon_promotion_discount
-			new_so_doc.has_muhas_multi_company_exception = 0
+			new_so_doc.has_multi_company_exception = 0
 			new_so_doc.ignore_fc_changes = 1
 			new_so_doc.handle_company_changes()
 			new_so_doc.insert(ignore_permissions=True)
