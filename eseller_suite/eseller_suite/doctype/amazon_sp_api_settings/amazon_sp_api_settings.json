@@ -38,7 +38,6 @@
   "enable_sync",
   "max_retry_limit",
   "create_item_if_not_exists",
-  "is_old_data_migrated",
   "map_state_data",
   "adjust_stock_for_returns",
   "return_invoice_stock_adjustment_before"
@@ -196,16 +195,6 @@
    "non_negative": 1
   },
   {
-   "default": "0",
-   "fieldname": "is_old_data_migrated",
-   "fieldtype": "Check",
-   "hidden": 1,
-   "label": "Is old data migrated",
-   "print_hide": 1,
-   "read_only": 1,
-   "report_hide": 1
-  },
-  {
    "default": "1",
    "fieldname": "create_item_if_not_exists",
    "fieldtype": "Check",
@@ -273,6 +262,7 @@
    "reqd": 1
   },
   {
+   "description": "Default Customer for Sales",
    "fieldname": "amazon_customer",
    "fieldtype": "Link",
    "label": "Amazon Customer",
@@ -295,7 +285,7 @@
   }
  ],
  "links": [],
- "modified": "2026-03-12 14:09:55.674760",
+ "modified": "2026-04-22 11:03:15.639065",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon SP API Settings",

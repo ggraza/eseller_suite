@@ -94,14 +94,17 @@ class AmazonSPAPISettings(Document):
 	def save(self):
 		super(AmazonSPAPISettings, self).save()
 
-		# if not self.is_old_data_migrated:
-		# 	self.db_set("is_old_data_migrated", 1)
-
 	def validate_after_date(self):
-		if datetime.strptime(add_days(today(), -60), "%Y-%m-%d") > datetime.strptime(
-			get_date_str(self.after_date), "%Y-%m-%d"
-		):
-			frappe.throw(_("The date must be within the last 60 days."))
+		if getdate(self.after_date) > getdate(today()):
+			frappe.throw(_("The date cannot be in the future."))
+		if getdate(self.after_date) < add_days(getdate(today()), -60):
+			self.enable_sync = 0
+			self.sync_selected_date_only = 1
+			frappe.msgprint(
+				_("As the date is more than 60 days in the past, sync has been disabled and 'Sync Selected Date Only' has been enabled. Please update the date or enable sync if you want to fetch data for this date."),
+				indicator="orange",
+				alert=True
+			)
 
 	@frappe.whitelist()
 	def get_order_details(self):
