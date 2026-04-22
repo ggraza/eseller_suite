@@ -592,5 +592,14 @@
   "name": "UT",
   "state": "Uttarakhand",
   "state_code": "UK"
+ },
+ {
+  "amazon_state": "BR",
+  "docstatus": 0,
+  "doctype": "Amazon State Mapping",
+  "modified": "2026-04-22 12:23:10.937447",
+  "name": "BR",
+  "state": "Bihar",
+  "state_code": "BR"
  }
 ]
