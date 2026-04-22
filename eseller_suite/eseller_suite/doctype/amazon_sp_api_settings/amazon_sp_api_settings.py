@@ -652,6 +652,8 @@ def create_daily_reports_schedule():
 	'''
 		Scheduler to create reports for the previous day.
 	'''
+	if not frappe.db.get_single_value("eSeller Settings", "enable_report_scheduler"):
+		return
 	from_date = add_days(getdate(), -1)
 	to_date = getdate()
 	amz_settings = frappe.get_all(

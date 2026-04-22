@@ -66,7 +66,7 @@ def get_report_status(report_log_id):
 		Get the status of a report by its ID
 	'''
 	if not frappe.db.exists("Amazon Report API Log", report_log_id):
-		frappe.log_error(title="Amazon Report API Log Not Found", message=f"Report Log {report_log_id} does not exist.")
+		return
 	amz_settings = frappe.get_all(
 		"Amazon SP API Settings",
 		filters={"is_active": 1},
@@ -213,6 +213,8 @@ def get_report_status_scheduler():
 	'''
 		Scheduled function to check status of all pending reports
 	'''
+	if not frappe.db.get_single_value("eSeller Settings", "enable_report_scheduler"):
+		return
 	pending_reports = frappe.get_all("Amazon Report API Log",
 		filters={"report_processing_status": ['!=', 'DONE'], "file_processed": 0},
 		pluck="name"
