@@ -17,6 +17,7 @@
   "default_receivable_account",
   "fetch_customizations_section",
   "remaining_refunds_have_no_returns",
+  "consider_so_only",
   "payment_details_section",
   "payment_details",
   "amended_from"
@@ -113,6 +114,12 @@
    "fieldname": "reset_progress",
    "fieldtype": "Button",
    "label": "Reset Progress"
+  },
+  {
+   "default": "1",
+   "fieldname": "consider_so_only",
+   "fieldtype": "Check",
+   "label": "Consider SO Only"
   }
  ],
  "grid_page_length": 50,
@@ -124,7 +131,7 @@
    "link_fieldname": "cheque_no"
   }
  ],
- "modified": "2026-03-17 16:16:18.810631",
+ "modified": "2026-05-05 18:38:37.739025",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon Payment Entry",
