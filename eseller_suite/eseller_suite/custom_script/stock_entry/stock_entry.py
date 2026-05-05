@@ -16,6 +16,7 @@ def on_submit(doc, method):
 		Method which trigger on on_submit event of Stock Entry
 	'''
 	validate_bundle_amount_difference(doc)
+	unset_stn_exception(doc)
 
 def transfer_barcodes(doc, method=None):
 	"""method transfers the barcodes on submit
@@ -179,3 +180,11 @@ def process_bundle_items(bundle_items, from_warehouse=None, to_warehouse=None):
 		data.extend(bundle_data)
 
 	return data
+
+def unset_stn_exception(doc):
+	'''
+		Method to unset STN exception after stock entry submission
+	'''
+	if frappe.db.exists('Amazon STN Entry Item', {'stock_entry': doc.name}):
+		stn_entry_item  = frappe.db.get_value('Amazon STN Entry Item', {'stock_entry': doc.name}, 'name')
+		frappe.db.set_value('Amazon STN Entry Item', stn_entry_item, 'error_log', '')

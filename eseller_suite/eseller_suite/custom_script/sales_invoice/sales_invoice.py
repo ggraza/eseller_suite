@@ -15,6 +15,13 @@ def validate(doc, method):
 				serial_nos = get_serial_nos(item.warehouse, item.item_code, item.qty)
 				item.serial_no = "\n".join(serial_nos)
 
+def on_submit(doc, method):
+	'''
+		Method which get trgiggered in on_submit event
+	'''
+	if doc.amazon_invoice_id:
+		unset_stn_exception(doc)
+
 def on_cancel(doc, method):
 	'''
 		Method which get trgiggered in on_cancel event
@@ -72,3 +79,12 @@ def set_discount_based_on_amazon_value(doc):
 		if diff and (1 > diff > -1):
 			doc.apply_discount_on = 'Grand Total'
 			doc.discount_amount = diff
+
+def unset_stn_exception(doc):
+	'''
+		Method to unset STN exception after invoice submission
+	'''
+	if frappe.db.exists('Amazon STN Entry Item', {'sales_invoice': doc.name}):
+		stn_entry_item, pi_ref  = frappe.db.get_value('Amazon STN Entry Item', {'sales_invoice': doc.name}, ['name', 'purchase_invoice'])
+		if frappe.db.get_value('Purchase Invoice', pi_ref, 'docstatus') == 1:
+			frappe.db.set_value('Amazon STN Entry Item', stn_entry_item, 'error_log', '')
