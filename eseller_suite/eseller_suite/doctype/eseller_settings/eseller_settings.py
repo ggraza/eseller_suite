@@ -48,3 +48,12 @@ def get_all_companies():
 		Returns a list of all companies in the system, ordered by name.
 	'''
 	return frappe.get_all("Company", fields=["name"], order_by="name asc")
+
+@frappe.whitelist()
+def get_naming_series_options(doctype='Sales Invoice'):
+	'''
+		Returns a list of naming series options for a given doctype.
+	'''
+	options = frappe.get_meta(doctype).get_naming_series_options()
+	series = [v for v in options if v and str(v).strip()]
+	return series

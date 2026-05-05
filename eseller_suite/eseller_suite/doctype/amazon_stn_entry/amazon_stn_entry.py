@@ -109,14 +109,21 @@ class AmazonSTNEntry(Document):
 		date_str = stn_row.get("invoice_date_str")
 		if date_str:
 			try:
-				dt = datetime.strptime(date_str.strip(), "%d/%m/%y %H:%M")
+				# 2025-04-30 10:44:48
+				dt = datetime.strptime(date_str.strip(), "%Y-%m-%d %H:%M:%S")
 				stn_row["invoice_date"] = dt.strftime("%Y-%m-%d")
 				stn_row["invoice_time"] = dt.strftime("%H:%M:%S")
-			except ValueError as e:
-				frappe.log_error(
-					title="Invalid Invoice Date Format",
-					message=f"Failed on: '{date_str}' | Error: {e}"
-				)
+			except:
+				try:
+					# 30/04/2025-04-30 10:44
+					dt = datetime.strptime(date_str.strip(), "%d/%m/%y %H:%M")
+					stn_row["invoice_date"] = dt.strftime("%Y-%m-%d")
+					stn_row["invoice_time"] = dt.strftime("%H:%M:%S")
+				except ValueError as e:
+					frappe.log_error(
+						title="Invalid Invoice Date Format",
+						message=f"Failed on: '{date_str}' | Error: {e}"
+					)
 
 		child = self.append("stn_entries", stn_row)
 		self.map_companies_and_warehouses(child)
@@ -590,6 +597,9 @@ class AmazonSTNEntry(Document):
 			price_list = frappe.db.get_single_value("eSeller Settings", "inter_company_price_list")
 			if price_list:
 				si.selling_price_list = price_list
+			stn_si_series = frappe.db.get_single_value("eSeller Settings", "stn_sales_invoice_series")
+			if stn_si_series:
+				si.naming_series = stn_si_series
 
 			si.append("items", {
 				"item_code": row.item,
