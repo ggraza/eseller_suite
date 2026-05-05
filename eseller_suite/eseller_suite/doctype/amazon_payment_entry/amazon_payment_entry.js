@@ -97,6 +97,7 @@ async function get_missing_sales_orders(frm) {
 			row.order_id &&
 			row.ready_to_process == 0 &&
 			row.order_id.trim() !== "" &&
+			(frm.doc.consider_so_only ? row.has_sales_order == 0 : true) &&
 			count < max_invoice_count &&
 			!amazon_order_ids.includes(row.order_id.trim())
 		) {

@@ -21,6 +21,8 @@ def on_submit(doc, method):
 			title=title,
 			msg=msg
 		)
+	if doc.amazon_invoice_id:
+		unset_stn_exception(doc)
 
 def on_cancel(doc, method):
 	'''
@@ -74,3 +76,12 @@ def set_discount_based_on_amazon_value(doc):
 		if diff and (1 > diff > -1):
 			doc.apply_discount_on = 'Grand Total'
 			doc.discount_amount = diff
+
+def unset_stn_exception(doc):
+	'''
+		Method to unset STN exception after invoice submission
+	'''
+	if frappe.db.exists('Amazon STN Entry Item', {'purchase_invoice': doc.name}):
+		stn_entry_item, si_ref  = frappe.db.get_value('Amazon STN Entry Item', {'purchase_invoice': doc.name}, ['name', 'sales_invoice'])
+		if frappe.db.get_value('Sales Invoice', si_ref, 'docstatus') == 1:
+			frappe.db.set_value('Amazon STN Entry Item', stn_entry_item, 'error_log', '')
