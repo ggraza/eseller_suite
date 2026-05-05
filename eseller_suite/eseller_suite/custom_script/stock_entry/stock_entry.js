@@ -510,8 +510,6 @@ function run_bundle_update(frm, source) {
 function restrict_actions_for_amazon_invoice(frm) {
 	if (frm.doc.amazon_invoice_id) {
 		dbg("amazon_invoice_id present — disabling form");
-		frm.disable_form();
-		frm.disable_save();
 		frm.clear_custom_buttons();
 	}
 }
