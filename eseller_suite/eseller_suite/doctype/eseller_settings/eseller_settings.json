@@ -11,6 +11,7 @@
   "main_company",
   "column_break_hkqn",
   "inter_company_price_list",
+  "stn_sales_invoice_series",
   "section_break_lnmo",
   "allow_missing_warehouse_creation",
   "parent_warehouses",
@@ -205,13 +206,19 @@
    "fieldname": "enable_report_scheduler",
    "fieldtype": "Check",
    "label": "Enable Report Scheduler"
+  },
+  {
+   "description": "Naming series for auto created Sales Invoices",
+   "fieldname": "stn_sales_invoice_series",
+   "fieldtype": "Select",
+   "label": "Sales Invoice Series"
   }
  ],
  "hide_toolbar": 1,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-04-22 15:16:37.414441",
+ "modified": "2026-05-05 13:32:44.823589",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "eSeller Settings",
