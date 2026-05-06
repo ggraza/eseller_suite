@@ -48,8 +48,8 @@ function handle_custom_buttons(frm) {
 				fetch_invoice_details(frm);
 			}, 'Fetch');
 
-			frm.add_custom_button('Missing Sales Orders', () => {
-				get_missing_sales_orders(frm);
+			frm.add_custom_button('Missing Sales Orders', async () => {
+				await get_missing_sales_orders(frm);
 			}, 'Fetch');
 
 			// Button for debug purposes only for Administrator
@@ -79,34 +79,11 @@ function fetch_invoice_details(frm) {
 }
 
 /**
- * Function to fetch missing sales orders based on the payment details
- * and sync them using the Amazon SP API Settings.
- * It limits the number of invoices fetched based on the max_invoice_count setting.
+ * Function to continuously fetch missing sales orders
+ * until all eligible order IDs are synced.
  */
 async function get_missing_sales_orders(frm) {
-	let amazon_order_ids = [];
-	let count = 0;
-
-	const max_invoice_count = await frappe.db.get_single_value(
-		"eSeller Settings",
-		"max_invoice_count"
-	);
-
-	for (const row of frm.doc.payment_details) {
-		if (
-			row.order_id &&
-			row.ready_to_process == 0 &&
-			row.order_id.trim() !== "" &&
-			(frm.doc.consider_so_only ? row.has_sales_order == 0 : true) &&
-			count < max_invoice_count &&
-			!amazon_order_ids.includes(row.order_id.trim())
-		) {
-			amazon_order_ids.push(row.order_id.trim());
-			count++;
-		} else if (count >= max_invoice_count) {
-			break;
-		}
-	}
+	let has_more_orders = true;
 
 	const records = await frappe.db.get_list("Amazon SP API Settings", {
 		fields: ["name"],
@@ -120,32 +97,92 @@ async function get_missing_sales_orders(frm) {
 		return;
 	}
 
-	for (let i = 0; i < amazon_order_ids.length; i++) {
-		frappe.show_progress(
-			"Syncing Sales Order..",
-			i + 1,
-			amazon_order_ids.length,
-			__("Fetching {0} of {1} invoices", [i + 1, amazon_order_ids.length])
+	do {
+		await frm.reload_doc();
+
+		let amazon_order_ids = [];
+		let count = 0;
+
+		const max_invoice_count = await frappe.db.get_single_value(
+			"eSeller Settings",
+			"max_invoice_count"
 		);
 
-		try {
-			await frappe.call({
-				method:
-					"eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository.get_order",
-				args: {
-					amz_setting_name,
-					amazon_order_ids: amazon_order_ids[i],
-				},
-				freeze: true,
-				freeze_message: __("Syncing Sales Order.."),
-			});
-		} catch (err) {
-			console.error("Error fetching order:", err);
+		for (const row of frm.doc.payment_details) {
+			if (
+				row.order_id &&
+				row.ready_to_process == 0 &&
+				row.order_id.trim() !== "" &&
+				(frm.doc.consider_so_only ? row.has_sales_order == 0 : true) &&
+				count < max_invoice_count &&
+				!amazon_order_ids.includes(row.order_id.trim())
+			) {
+				amazon_order_ids.push(row.order_id.trim());
+				count++;
+			}
 		}
-	}
 
-	frappe.hide_progress(); // hide after loop
+		// Stop if no more orders
+		if (amazon_order_ids.length === 0) {
+			break;
+		}
+
+		// Process current batch
+		for (let i = 0; i < amazon_order_ids.length; i++) {
+			frappe.show_progress(
+				"Syncing Sales Order..",
+				i + 1,
+				amazon_order_ids.length,
+				__("Fetching {0} of {1} invoices", [
+					i + 1,
+					amazon_order_ids.length,
+				])
+			);
+
+			try {
+				console.log(`Fetching order for Amazon Order ID: ${amazon_order_ids[i]}`);
+
+				await frappe.call({
+					method:
+						"eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository.get_order",
+					args: {
+						amz_setting_name,
+						amazon_order_ids: amazon_order_ids[i],
+					},
+					freeze: true,
+					freeze_message: __("Syncing Sales Order.."),
+				});
+
+			} catch (err) {
+				console.error("Error fetching order:", err);
+			}
+		}
+
+		// Fetch invoice details after batch
+		await frm.call({
+			method: "fetch_invoice_details",
+			doc: frm.doc,
+			freeze: true,
+			freeze_message: __("Fetching Invoice Details..."),
+		});
+
+		await frm.reload_doc();
+
+		// Repeat only if consider_so_only is enabled
+		has_more_orders = frm.doc.consider_so_only ? true : false;
+
+	} while (has_more_orders);
+
+	frappe.hide_progress();
+
+	frappe.show_alert({
+		message: __("Sales order syncing completed"),
+		indicator: "green",
+	});
+
+	await frm.reload_doc();
 }
+
 
 /**
  * function to uncheck ready to process checks in all the lines in the table
