@@ -2,7 +2,6 @@
  "actions": [],
  "allow_rename": 1,
  "autoname": "AMZN-PAY-.#####",
- "beta": 1,
  "creation": "2024-09-13 12:06:58.759396",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -131,7 +130,7 @@
    "link_fieldname": "cheque_no"
   }
  ],
- "modified": "2026-05-05 18:38:37.739025",
+ "modified": "2026-05-07 12:40:57.040340",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon Payment Entry",
@@ -139,6 +138,7 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -147,6 +147,32 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User",
    "share": 1,
    "write": 1
   }
