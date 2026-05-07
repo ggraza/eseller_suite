@@ -21,6 +21,7 @@ def on_submit(doc, method):
 	'''
 	if doc.amazon_invoice_id:
 		unset_stn_exception(doc)
+	delete_failed_invoice_records(doc)
 
 def on_cancel(doc, method):
 	'''
@@ -88,3 +89,14 @@ def unset_stn_exception(doc):
 		stn_entry_item, pi_ref  = frappe.db.get_value('Amazon STN Entry Item', {'sales_invoice': doc.name}, ['name', 'purchase_invoice'])
 		if frappe.db.get_value('Purchase Invoice', pi_ref, 'docstatus') == 1:
 			frappe.db.set_value('Amazon STN Entry Item', stn_entry_item, 'error_log', '')
+
+def delete_failed_invoice_records(self):
+	'''
+		Method to delete failed invoice records related to the invoice
+	'''
+	frappe.db.delete(
+		"Amazon Failed Invoice Record",
+		{
+			"invoice_id": self.name
+		}
+	)
