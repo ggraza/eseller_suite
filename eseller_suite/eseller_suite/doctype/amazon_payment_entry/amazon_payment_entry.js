@@ -19,20 +19,10 @@ frappe.ui.form.on("Amazon Payment Entry", {
 		if (!frm.is_new() && frm.doc.docstatus === 0 && frm.doc.in_progress === 0) {
 			handle_custom_buttons(frm);
 		}
-		frappe.realtime.on("fetch_invoice_details", (data) => {
-			frappe.hide_msgprint(true);
-			frappe.show_progress('Fetching Invoice Details...', data.progress, data.total, __("Fetching {0} of {1} invoices", [data.progress, data.total]), true);
-			if (data.progress === data.total) {
-				frm.reload_doc();
-			}
-		});
-		frappe.realtime.on("get_missing_sales_orders", (data) => {
-			frappe.hide_msgprint(true);
-			frappe.show_progress('Syncing Sales Order..', data.progress, data.total, __("Fetching {0} of {1} invoices", [data.progress, data.total]), true);
-			if (data.progress === data.total) {
-				frm.reload_doc();
-			}
-		});
+		if (!frm.is_new() && frm.doc.docstatus === 0) {
+			set_introduction_texts(frm);
+		}
+		handle_realtime_updates(frm);
 	},
 	reset_progress(frm) {
 		frm.set_value('in_progress', 0);
@@ -40,6 +30,23 @@ frappe.ui.form.on("Amazon Payment Entry", {
 		frm.save();
 	}
 });
+
+function handle_realtime_updates(frm) {
+	frappe.realtime.on("fetch_invoice_details", (data) => {
+		frappe.hide_msgprint(true);
+		frappe.show_progress('Fetching Invoice Details...', data.progress, data.total, __("Fetching {0} of {1} invoices", [data.progress, data.total]), true);
+		if (data.progress === data.total) {
+			frm.reload_doc();
+		}
+	});
+	frappe.realtime.on("get_missing_sales_orders", (data) => {
+		frappe.hide_msgprint(true);
+		frappe.show_progress('Syncing Sales Order..', data.progress, data.total, __("Fetching {0} of {1} invoices", [data.progress, data.total]), true);
+		if (data.progress === data.total) {
+			frm.reload_doc();
+		}
+	});
+}
 
 function handle_custom_buttons(frm) {
 	if (!frm.is_new() && frm.doc.docstatus === 0) {
@@ -203,4 +210,29 @@ function unset_ready_to_process(frm) {
 			frm.reload_doc();
 		}
 	});
+}
+
+function set_introduction_texts(frm) {
+	if (frm.doc.docstatus === 0) {
+		frm.set_intro('');
+		const total_count = frm.doc.payment_details ? frm.doc.payment_details.length : 0;
+		// Get rows where checkbox is NOT checked
+		const remaining_rows = (frm.doc.payment_details || []).filter(
+			row => !row.ready_to_process
+		);
+		// Remaining unchecked rows count
+		const remaining_count = remaining_rows.length;
+
+		if (remaining_count === 0) {
+			frm.set_intro('Amazon Payment Entry is ready to submit', 'green');
+		}
+		else {
+			frm.set_intro(
+				__('Please process all missing orders ({0} out of {1} remaining) before submitting.',
+					[remaining_count, total_count]),
+				'red'
+			);
+			frm.disable_save();
+		}
+	}
 }

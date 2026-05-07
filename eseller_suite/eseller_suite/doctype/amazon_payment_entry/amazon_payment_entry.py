@@ -6,9 +6,10 @@ import os
 from datetime import datetime
 
 import frappe
+from frappe import _
 from charset_normalizer import from_path
 from frappe.model.document import Document
-from frappe.utils import get_link_to_form, get_url_to_form
+from frappe.utils import get_url_to_form
 
 from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository import (
 	get_order,
@@ -34,6 +35,7 @@ class AmazonPaymentEntry(Document):
 			self.process_payment_data()
 
 	def on_submit(self):
+		self.validate_missing_invoices()
 		frappe.db.set_value(self.doctype, self.name, 'in_progress', 1)
 		self.create_journal_entry()
 
@@ -377,6 +379,20 @@ class AmazonPaymentEntry(Document):
 			row.amazon_expense_account = ''
 			row.customer = ''
 		self.save()
+
+	def validate_missing_invoices(self):
+		'''
+			Validate whether all rows are processed before submission.
+		'''
+		remaining_count = sum(
+			1 for row in self.payment_details if not row.ready_to_process
+		)
+
+		if remaining_count:
+			frappe.throw(
+				title="Action Required",
+				msg=_("{0} row(s) are still pending invoice fetch. Please process all rows before submitting.").format(remaining_count)
+			)
 
 def get_invoice_details(amazon_order_id, is_return=0, amount=0):
 	'''
