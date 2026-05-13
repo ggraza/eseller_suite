@@ -22,6 +22,7 @@ def on_submit(doc, method):
 	if doc.amazon_invoice_id:
 		unset_stn_exception(doc)
 	delete_failed_invoice_records(doc)
+	delete_failed_sync_records(doc)
 
 def on_cancel(doc, method):
 	'''
@@ -48,7 +49,7 @@ def on_cancel(doc, method):
 
 def before_submit(doc, method):
 	'''
-        Method which get trgiggered in before_submit event
+		Method which get trgiggered in before_submit event
 	'''
 	if doc.replaced_order_id and doc.amazon_order_id:
 		create_stock_entry(doc.name)
@@ -58,14 +59,15 @@ def get_serial_nos(warehouse, item_code, qty):
 		Fetch serial numbers using FIFO for the given item and quantity.
 	"""
 	serial_no_list = frappe.get_all("Serial No",
-        filters={
-            "warehouse": warehouse,
-            "item_code": item_code,
-            "status": "Active"
-        },
-        fields=["name"],
-        order_by="creation asc",
-        limit=qty)
+		filters={
+			"warehouse": warehouse,
+			"item_code": item_code,
+			"status": "Active"
+		},
+		fields=["name"],
+		order_by="creation asc",
+		limit=qty
+	)
 	if len(serial_no_list) < qty:
 		frappe.throw(f"Not enough serial numbers available for item {item_code}.")
 	return [serial_no.name for serial_no in serial_no_list]
@@ -100,3 +102,15 @@ def delete_failed_invoice_records(self):
 			"invoice_id": self.name
 		}
 	)
+
+def delete_failed_sync_records(self):
+	'''
+		Method to delete failed invoice records related to the invoice
+	'''
+	filters = {
+		"amazon_order_id": self.amazon_order_id,
+	}
+	if self.grand_total == 0:
+		filters['replaced_so'] = ['is', 'set']
+		filters['replaced_jv'] = ['is', 'set']
+	frappe.db.delete( "Amazon Failed Sync Record", filters=filters)
