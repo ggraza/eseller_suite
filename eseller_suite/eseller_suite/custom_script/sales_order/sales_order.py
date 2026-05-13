@@ -41,7 +41,12 @@ class SalesOrderOverride(SalesOrder):
 		self.grand_total = total + total_taxes_and_charges
 		self.base_grand_total = total + total_taxes_and_charges
 
+	def before_validate(self):
+		self.set_internal_amazon_order_id()
+		super(SalesOrderOverride, self).before_validate()
+
 	def validate(self):
+		self.set_internal_amazon_order_id()
 		self.custom_validate()
 		recall_order_prefixes = ['S']
 		super(SalesOrderOverride, self).validate()
@@ -344,6 +349,17 @@ class SalesOrderOverride(SalesOrder):
 			if fc_exception_tag:
 				if frappe.db.exists('Tag Link', { 'document_type':self.doctype, 'document_name': self.name, 'tag': fc_exception_tag}):
 					self.has_multi_company_exception = 1
+
+	def set_internal_amazon_order_id(self):
+		'''
+			Method to set internal amazon order id for the sales order based on Company
+		'''
+		if self.amazon_order_id and self.company:
+			company_abr = frappe.db.get_value('Company', self.company, 'abbr')
+			self.amazon_order_id_internal = f"{self.amazon_order_id}-{company_abr}"
+		if self.docstatus == 0:
+			if frappe.db.exists('Sales Order', {'amazon_order_id_internal': self.amazon_order_id_internal, 'name': ['!=', self.name]}):
+				frappe.db.delete('Sales Order', self.name)
 
 def get_account_head(current_acc, company):
 	'''

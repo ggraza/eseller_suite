@@ -15,6 +15,12 @@ def validate(doc, method):
 				serial_nos = get_serial_nos(item.warehouse, item.item_code, item.qty)
 				item.serial_no = "\n".join(serial_nos)
 
+def after_insert(doc, method):
+	'''
+		Method which get trgiggered in after_insert event
+	'''
+	delete_failed_sync_records(doc)
+
 def on_submit(doc, method):
 	'''
 		Method which get trgiggered in on_submit event
@@ -22,7 +28,6 @@ def on_submit(doc, method):
 	if doc.amazon_invoice_id:
 		unset_stn_exception(doc)
 	delete_failed_invoice_records(doc)
-	delete_failed_sync_records(doc)
 
 def on_cancel(doc, method):
 	'''
@@ -111,6 +116,5 @@ def delete_failed_sync_records(self):
 		"amazon_order_id": self.amazon_order_id,
 	}
 	if self.grand_total == 0:
-		filters['replaced_so'] = ['is', 'set']
 		filters['replaced_jv'] = ['is', 'set']
 	frappe.db.delete( "Amazon Failed Sync Record", filters=filters)

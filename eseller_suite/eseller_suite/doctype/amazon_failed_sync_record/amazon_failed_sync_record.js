@@ -19,22 +19,22 @@ function handle_custom_buttons(frm) {
 			}).addClass("btn-primary");
 		}
 		if (frm.doc.replaced_order_id) {
-			if (!frm.doc.replaced_so) {
-				frappe.db.get_value('Sales Order', { amazon_order_id: frm.doc.amazon_order_id }, 'name')
-					.then(r => { // checking if the replaced so is already created from another source
-						if (!r.message.name) {
-							frm.add_custom_button('Sales Order', () => {
-								create_replaced_so(frm);
-							}, 'Create');
-						}
-					})
-			}
 			if (!frm.doc.replaced_jv) {
 				frappe.db.get_value('Journal Entry', { amazon_order_id: frm.doc.amazon_order_id }, 'name')
 					.then(r => { // checking if the replaced jv is already created from another source
 						if (!r.message.name) {
 							frm.add_custom_button('Journal Entry', () => {
 								create_replaced_jv(frm);
+							}, 'Create');
+						}
+					})
+			}
+			if (!frm.doc.replaced_so && frm.doc.replaced_jv) {
+				frappe.db.get_value('Sales Order', { amazon_order_id: frm.doc.amazon_order_id }, 'name')
+					.then(r => { // checking if the replaced so is already created from another source
+						if (!r.message.name) {
+							frm.add_custom_button('Sales Order', () => {
+								create_replaced_so(frm);
 							}, 'Create');
 						}
 					})
@@ -93,6 +93,10 @@ function create_replaced_so(frm) {
 		freeze_message: __("Creating Replaced Sales Order.."),
 		callback: (r) => {
 			frm.reload_doc();
+			// Redirect to list view since record is deleted
+			setTimeout(() => {
+				frappe.set_route("List", "Amazon Failed Sync Record");
+			}, 1000);
 		}
 	});
 }
