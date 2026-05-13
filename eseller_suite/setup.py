@@ -224,6 +224,16 @@ def get_sales_order_custom_fields():
 				"no_copy": 1,
 				"hidden": 1
 			},
+			{
+				"fieldname": "amazon_order_id_internal",
+				"fieldtype": "Data",
+				"label": "Amazon Order ID(Internal)",
+				"insert_after": "company",
+				"read_only": 1,
+				"no_copy": 1,
+				"hidden": 1,
+				"unique": 1
+			},
 		],
 		"Sales Order Item": [
 			{

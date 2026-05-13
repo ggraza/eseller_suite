@@ -134,6 +134,7 @@ doc_events = {
 	'Sales Invoice':{
 		"before_validate": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.before_validate",
 		"validate": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.validate",
+		"after_insert": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.after_insert",
 		"before_submit": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.before_submit",
 		"on_submit": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.on_submit",
 		"on_cancel": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.on_cancel",
