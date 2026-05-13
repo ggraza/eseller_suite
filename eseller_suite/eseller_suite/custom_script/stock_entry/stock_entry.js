@@ -237,8 +237,8 @@ function process_bundle_paste(frm, target_el, text) {
 		return;
 	}
 
-	const grid            = frm.fields_dict.bundle_items.grid;
-	const doctype         = grid.doctype;
+	const grid = frm.fields_dict.bundle_items.grid;
+	const doctype = grid.doctype;
 	const grid_pagination = grid.grid_pagination;
 
 	dbg("grid doctype:", doctype, "| grid_rows count (at parse time):", grid.grid_rows ? grid.grid_rows.length : 0);
@@ -249,10 +249,10 @@ function process_bundle_paste(frm, target_el, text) {
 	}
 
 	const value_formatter_map = {
-		Date:     (val) => (val ? frappe.datetime.user_to_str(val) : val),
-		Int:      (val) => cint(val),
-		Check:    (val) => cint(val),
-		Float:    (val) => flt(val),
+		Date: (val) => (val ? frappe.datetime.user_to_str(val) : val),
+		Int: (val) => cint(val),
+		Check: (val) => cint(val),
+		Float: (val) => flt(val),
 		Currency: (val) => flt(val),
 	};
 
@@ -260,7 +260,7 @@ function process_bundle_paste(frm, target_el, text) {
 	let fieldnames = [];
 	let fieldtypes = [];
 
-	const first_cell   = data[0][0];
+	const first_cell = data[0][0];
 	const header_match = get_bundle_field(grid, first_cell);
 	dbg("header detection | first_cell:", JSON.stringify(first_cell), "| resolved fieldname:", header_match);
 
@@ -277,7 +277,7 @@ function process_bundle_paste(frm, target_el, text) {
 		dbg("  → header row consumed, remaining data rows:", data.length);
 	} else {
 		dbg("  → mode: ACTIVE COLUMN");
-		const visible_columns  = grid.grid_rows[0].get_visible_columns();
+		const visible_columns = grid.grid_rows[0].get_visible_columns();
 		const target_fieldname = $(target_el).data("fieldname");
 		dbg("  → target element fieldname (data-fieldname attr):", target_fieldname);
 		dbg("  → visible columns:", visible_columns.map(c => c.fieldname));
@@ -453,7 +453,7 @@ function run_bundle_update(frm, source) {
 
 	if (rows.length === 0) {
 		dbg("  → no valid rows — clearing items table");
-		frm.clear_table("items");
+		clear_items_from_bundle(frm);
 		frm.refresh_field("items");
 		return;
 	}
@@ -494,7 +494,7 @@ function run_bundle_update(frm, source) {
 				t_warehouse: d.t_warehouse,
 			})));
 
-			frm.clear_table("items");
+			clear_items_from_bundle(frm);
 			generated.forEach(d => frm.add_child("items", d));
 			frm.refresh_field("items");
 			dbg("  → items table updated ✓");
@@ -553,6 +553,14 @@ function fetch_item_details(frm, cdt, cdn) {
 			frappe.model.set_value(cdt, cdn, "item_name", r.message.item_name);
 			frappe.model.set_value(cdt, cdn, "description", r.message.description);
 			frappe.model.set_value(cdt, cdn, "uom", r.message.stock_uom);
+		}
+	});
+}
+
+function clear_items_from_bundle(frm) {
+	frm.doc.items.forEach(row => {
+		if (row.from_bundle_item || !row.item_code) {
+			frm.get_field("items").grid.grid_rows_by_docname[row.name].remove();
 		}
 	});
 }
