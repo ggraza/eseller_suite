@@ -16,10 +16,9 @@
  "name": "Duplicate Sales Order Check",
  "owner": "Administrator",
  "prepared_report": 0,
- "query": "SELECT\n    amazon_order_id,\n    grand_total,\n    company,\n    GROUP_CONCAT(name ORDER BY creation SEPARATOR ', ') AS sales_orders,\n    COUNT(*) AS total_count\nFROM\n    `tabSales Order`\nWHERE\n    amazon_order_id IS NOT NULL\n    AND amazon_order_id != ''\nGROUP BY\n    amazon_order_id,\n    grand_total,\n    company\nHAVING\n    COUNT(*) > 1;",
  "ref_doctype": "Sales Order",
  "report_name": "Duplicate Sales Order Check",
- "report_type": "Query Report",
+ "report_type": "Script Report",
  "roles": [],
  "timeout": 0
 }
