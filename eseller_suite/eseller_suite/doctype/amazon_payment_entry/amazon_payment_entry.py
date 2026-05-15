@@ -373,6 +373,7 @@ class AmazonPaymentEntry(Document):
 		'''Method to uncheck ready to process for all the rows in the payment details table'''
 		for row in self.payment_details:
 			row.ready_to_process = 0
+			row.has_sales_order = 0
 			row.sales_invoice = ''
 			row.return_sales_invoice = ''
 			row.company = ''
