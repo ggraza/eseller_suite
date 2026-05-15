@@ -2,6 +2,14 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on("Amazon Payment Entry", {
+	setup(frm) {
+		const original_dirty = frm.dirty;
+		frm.dirty = function () {
+			original_dirty.apply(frm, arguments);
+			// runs whenever form becomes dirty
+			on_form_dirty(frm);
+		};
+	},
 	onload(frm) {
 		if (frm.is_new()) {
 			frappe.db.get_single_value('eSeller Settings', 'default_mode_of_payment').then(default_mode_of_payment => {
@@ -30,6 +38,12 @@ frappe.ui.form.on("Amazon Payment Entry", {
 		frm.save();
 	}
 });
+
+function on_form_dirty(frm) {
+	if (frm.doc.docstatus === 0) {
+		frm.enable_save();
+	}
+}
 
 function handle_realtime_updates(frm) {
 	frappe.realtime.on("fetch_invoice_details", (data) => {
