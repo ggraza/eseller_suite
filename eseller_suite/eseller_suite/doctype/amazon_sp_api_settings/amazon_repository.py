@@ -1774,7 +1774,7 @@ class AmazonRepository:
 		frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", queue="long")
 		return sales_orders
 
-	def get_order(self, amazon_order_ids) -> list:
+	def get_order(self, amazon_order_ids, run_si_submit_job=1) -> list:
 		orders = self.get_orders_instance()
 		order_payload = self.call_sp_api_method(
 			sp_api_method=orders.get_order,
@@ -1834,7 +1834,8 @@ class AmazonRepository:
 						)
 				# Re-throw with enhanced error message
 				frappe.throw(enhanced_error)
-		frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", queue="long")
+		if run_si_submit_job == 1:
+			frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", queue="long")
 		return sales_orders
 
 	def get_catalog_items_instance(self) -> CatalogItems:
@@ -1862,9 +1863,9 @@ def get_orders(amz_setting_name, last_updated_after, sync_selected_date_only=0, 
 	return ar.get_orders(last_updated_after, sync_selected_date_only, amazon_order_ids)
 
 @frappe.whitelist()
-def get_order(amz_setting_name, amazon_order_ids) -> list:
+def get_order(amz_setting_name, amazon_order_ids, run_si_submit_job=1) -> list:
 	ar = AmazonRepository(amz_setting_name)
-	return ar.get_order(amazon_order_ids)
+	return ar.get_order(amazon_order_ids, run_si_submit_job)
 
 
 @frappe.whitelist()

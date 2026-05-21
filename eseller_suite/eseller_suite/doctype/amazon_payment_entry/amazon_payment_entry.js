@@ -161,23 +161,29 @@ async function get_missing_sales_orders(frm) {
 			);
 
 			try {
-				console.log(`Fetching order for Amazon Order ID: ${amazon_order_ids[i]}`);
-
 				await frappe.call({
 					method:
 						"eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository.get_order",
 					args: {
-						amz_setting_name,
+						amz_setting_name: amz_setting_name,
 						amazon_order_ids: amazon_order_ids[i],
+						run_si_submit_job: 0,
 					},
 					freeze: true,
 					freeze_message: __("Syncing Sales Order.."),
 				});
-
 			} catch (err) {
 				console.error("Error fetching order:", err);
 			}
 		}
+
+		// Run SI submit job after processing the batch
+		await frm.call({
+			method: "submit_invoices_in_background",
+			doc: frm.doc,
+			freeze: true,
+			freeze_message: __("Fetching Invoice Details..."),
+		});
 
 		// Fetch invoice details after batch
 		await frm.call({
