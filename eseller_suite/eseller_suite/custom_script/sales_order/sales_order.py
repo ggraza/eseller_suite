@@ -357,6 +357,8 @@ class SalesOrderOverride(SalesOrder):
 		if self.amazon_order_id and self.company:
 			company_abr = frappe.db.get_value('Company', self.company, 'abbr')
 			self.amazon_order_id_internal = f"{self.amazon_order_id}-{company_abr}"
+		if self.is_split_order:
+			self.amazon_order_id_internal = f"{self.amazon_order_id}-{company_abr}-S"
 		if self.docstatus == 0:
 			if frappe.db.exists('Sales Order', {'amazon_order_id_internal': self.amazon_order_id_internal, 'name': ['!=', self.name]}):
 				frappe.db.delete('Sales Order', self.name)
@@ -572,6 +574,7 @@ def split_so_based_on_company(sales_order):
 			new_so_doc.discount_amount = amazon_promotion_discount
 			new_so_doc.has_multi_company_exception = 0
 			new_so_doc.ignore_fc_changes = 1
+			new_so_doc.is_split_order = 1
 			new_so_doc.handle_company_changes()
 			new_so_doc.insert(ignore_permissions=True)
 			new_so_doc.submit()
