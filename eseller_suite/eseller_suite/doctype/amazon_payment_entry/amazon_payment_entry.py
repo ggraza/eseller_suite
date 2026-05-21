@@ -349,24 +349,13 @@ class AmazonPaymentEntry(Document):
 		)
 
 	@frappe.whitelist()
-	def get_missing_sales_orders(self):
-		frappe.db.set_value(self.doctype, self.name, 'in_progress', 1)
-		frappe.db.commit()
-		if frappe.db.exists('Amazon SP API Settings', { 'is_active':1 }):
-			amz_setting_name = frappe.db.get_value('Amazon SP API Settings', { 'is_active':1 })
-			max_invoice_count = frappe.db.get_single_value('eSeller Settings', 'max_invoice_count') or 25
-			total_invoice_to_fetch = len(frappe.db.get_all('Amazon Payment Entry Item', { 'parent':self.name, 'ready_to_process':0 }))
-			max_threshold = total_invoice_to_fetch if total_invoice_to_fetch <= max_invoice_count else max_invoice_count
-			i = 0
-			for row in self.payment_details:
-				if row.order_id and row.order_id != '---' and not row.ready_to_process and i<max_threshold:
-					i += 1
-					frappe.publish_realtime("get_missing_sales_orders", dict(progress=i, total=max_threshold))
-					try:
-						get_order(amz_setting_name=amz_setting_name, amazon_order_ids=row.order_id)
-					except Exception as e:
-						print(e)
-		frappe.db.set_value(self.doctype, self.name, 'in_progress', 0)
+	def submit_invoices_in_background(self):
+		'''
+			Method to trigger Sales Invoice Submission RQ Job
+		'''
+		print("\n\n\n\n Submitting Invoices in background \n\n\n\n")
+		frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", queue="long")
+		return 1 #for client side to know that the job has been triggered
 
 	@frappe.whitelist()
 	def unset_ready_to_process(self):
