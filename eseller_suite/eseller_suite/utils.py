@@ -95,3 +95,80 @@ def get_bundle_items(bundle_item):
 		item['uom'] = item_doc.stock_uom
 
 	return bundle_items
+
+def get_draft_sales_invoices_without_items():
+	'''
+		Returns Draft Sales Invoice that do not contain any items.
+	'''
+	query = """
+		SELECT
+			si.name,
+			si.amazon_order_id
+		FROM
+			`tabSales Invoice` si
+		LEFT JOIN `tabSales Invoice Item` sii
+			ON sii.parent = si.name
+		WHERE
+			si.docstatus = 0
+		GROUP BY si.amazon_order_id
+		HAVING COUNT(sii.name) = 0
+	"""
+	invoices = frappe.db.sql(query, as_dict=True)
+	return invoices
+
+@frappe.whitelist()
+def update_sales_invoice_with_items(invoice_id, amazon_order_id):
+	'''
+		Update missing items on Sales Invoice from Sales Order.
+	'''
+	si_doc = frappe.get_doc("Sales Invoice", invoice_id)
+	so = frappe.db.get_value("Sales Order", {"amazon_order_id": amazon_order_id}, "name")
+	if so:
+		so_doc = frappe.get_doc("Sales Order", so)
+
+		si_doc.items = []
+		for item in so_doc.items:
+			si_row = item.as_dict()
+			si_row['so_detail'] = item.name
+			si_row['sales_order'] = item.parent
+			si_row.pop('doctype')
+			si_row.pop('parenttype')
+			si_row.pop('name')
+			si_row.pop('parent')
+			si_doc.append("items", si_row)
+
+		si_doc.taxes = []
+		for tax in so_doc.taxes:
+			tax_row = tax.as_dict()
+			tax_row.pop('doctype')
+			tax_row.pop('parenttype')
+			tax_row.pop('name')
+			tax_row.pop('parent')
+			si_doc.append("taxes", tax_row)
+
+		si_doc.packed_items = []
+		for packed_item in so_doc.packed_items:
+			packed_item_row = packed_item.as_dict()
+			packed_item_row.pop('doctype')
+			packed_item_row.pop('parenttype')
+			packed_item_row.pop('name')
+			packed_item_row.pop('parent')
+			si_doc.append("packed_items", packed_item_row)
+
+	si_doc.save(ignore_permissions=True)
+	return si_doc.name
+
+@frappe.whitelist()
+def update_missing_items_in_sales_invoices(max_count=250):
+	'''
+		Update missing items on Draft Sales Invoices from Sales Orders.
+	'''
+	invoices = get_draft_sales_invoices_without_items()
+	if len(invoices) > max_count:
+		invoices = invoices[:max_count]
+	for invoice in invoices:
+		try:
+			update_sales_invoice_with_items(invoice.name, invoice.amazon_order_id)
+		except Exception as e:
+			frappe.log_error(message=f"Error updating Sales Invoice {invoice.name} with items: {str(e)}", title="Update Sales Invoice Items")
+	return len(invoices)
