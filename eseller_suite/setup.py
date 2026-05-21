@@ -234,6 +234,15 @@ def get_sales_order_custom_fields():
 				"hidden": 1,
 				"unique": 1
 			},
+			{
+				"fieldname": "is_split_order",
+				"fieldtype": "Check",
+				"label": "Is Split Order",
+				"insert_after": "amazon_order_id_internal",
+				"read_only": 1,
+				"no_copy": 1,
+				"hidden": 1,
+			},
 		],
 		"Sales Order Item": [
 			{
