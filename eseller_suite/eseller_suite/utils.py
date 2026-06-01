@@ -223,6 +223,6 @@ def delete_submitted_so_without_si(max_count=50):
 			so_doc = frappe.get_doc("Sales Order", so)
 			if so_doc.docstatus == 1:
 				so_doc.cancel()
-				# so_doc.delete()
+				so_doc.delete()
 		except Exception as e:
 			frappe.log_error(message=f"Error deleting Sales Order {so}: {str(e)}", title="Delete Sales Order")

@@ -92,6 +92,10 @@ class SalesOrderOverride(SalesOrder):
 				if temp_stock_transfer_doc.docstatus == 1:
 					temp_stock_transfer_doc.cancel()
 				temp_stock_transfer_doc.delete()
+		if self.amazon_order_id:
+			frappe.db.set_value('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id}, 'order_created', 0, update_modified=False)
+			frappe.db.set_value('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id}, 'invoice_created', 0, update_modified=False)
+			frappe.db.set_value('AFN Order Shipment Log', {'amazon_order_id': self.amazon_order_id}, 'fc_processed', 0, update_modified=False)
 
 	def before_submit(self):
 		if self.amazon_order_id:
