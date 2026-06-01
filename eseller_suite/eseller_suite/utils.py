@@ -172,3 +172,57 @@ def update_missing_items_in_sales_invoices(max_count=250):
 		except Exception as e:
 			frappe.log_error(message=f"Error updating Sales Invoice {invoice.name} with items: {str(e)}", title="Update Sales Invoice Items")
 	return len(invoices)
+
+@frappe.whitelist()
+def delete_submitted_invoices_without_stock(max_count=50):
+	'''
+		Delete submitted Sales Invoices that do not have any Stock Items.
+	'''
+	filters = {
+		'voucher_type': 'Sales Invoice',
+		'qty_after_transaction': ['<', 0],
+		'is_cancelled': 0,
+		'voucher_no': ['like', 'AMZ-2526-%']
+	}
+	sales_invoices = frappe.db.get_all('Stock Ledger Entry', filters=filters, pluck='voucher_no', limit_page_length=max_count)
+	sales_invoices = list(set(sales_invoices))  # Remove duplicates
+	for si in sales_invoices:
+		try:
+			si_doc = frappe.get_doc("Sales Invoice", si)
+			if si_doc.docstatus == 1:
+				si_doc.cancel()
+				si_doc.delete()
+		except Exception as e:
+			frappe.log_error(message=f"Error deleting Sales Invoice {si}: {str(e)}", title="Delete Sales Invoice")
+	return sales_invoices
+
+@frappe.whitelist()
+def delete_submitted_so_without_si(max_count=50):
+	'''
+		Delete submitted Sales Orders that do not have any linked Sales Invoices.
+	'''
+	query = """
+		SELECT
+			so.name
+		FROM
+			`tabSales Order` so
+		LEFT JOIN
+			`tabSales Invoice Item` sii
+			ON sii.sales_order = so.name
+		LEFT JOIN
+			`tabSales Invoice` si
+			ON si.name = sii.parent
+		WHERE
+			so.docstatus = 1
+			AND si.name IS NULL;
+	"""
+	data = frappe.db.sql(query, as_dict=True)
+	sales_orders = [so.name for so in data][:max_count]
+	for so in sales_orders:
+		try:
+			so_doc = frappe.get_doc("Sales Order", so)
+			if so_doc.docstatus == 1:
+				so_doc.cancel()
+				# so_doc.delete()
+		except Exception as e:
+			frappe.log_error(message=f"Error deleting Sales Order {so}: {str(e)}", title="Delete Sales Order")
