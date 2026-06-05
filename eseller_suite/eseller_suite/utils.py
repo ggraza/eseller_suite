@@ -174,7 +174,7 @@ def update_missing_items_in_sales_invoices(max_count=250):
 	return len(invoices)
 
 @frappe.whitelist()
-def delete_submitted_invoices_without_stock(max_count=50):
+def delete_submitted_invoices_without_stock(max_count=100):
 	'''
 		Delete submitted Sales Invoices that do not have any Stock Items.
 	'''
@@ -182,7 +182,7 @@ def delete_submitted_invoices_without_stock(max_count=50):
 		'voucher_type': 'Sales Invoice',
 		'qty_after_transaction': ['<', 0],
 		'is_cancelled': 0,
-		'voucher_no': ['like', 'AMZ-2526-%']
+		'voucher_no': ['like', 'AMZ-%']
 	}
 	sales_invoices = frappe.db.get_all('Stock Ledger Entry', filters=filters, pluck='voucher_no', limit_page_length=max_count)
 	sales_invoices = list(set(sales_invoices))  # Remove duplicates
@@ -197,7 +197,7 @@ def delete_submitted_invoices_without_stock(max_count=50):
 	return sales_invoices
 
 @frappe.whitelist()
-def delete_submitted_so_without_si(max_count=50):
+def delete_submitted_so_without_si(max_count=100):
 	'''
 		Delete submitted Sales Orders that do not have any linked Sales Invoices.
 	'''
@@ -223,6 +223,35 @@ def delete_submitted_so_without_si(max_count=50):
 			so_doc = frappe.get_doc("Sales Order", so)
 			if so_doc.docstatus == 1:
 				so_doc.cancel()
-				# so_doc.delete()
+				so_doc.delete()
 		except Exception as e:
 			frappe.log_error(message=f"Error deleting Sales Order {so}: {str(e)}", title="Delete Sales Order")
+
+@frappe.whitelist()
+def delete_submitted_invoices_without_gle(max_count=100):
+	'''
+	Delete submitted Sales Invoices that do not have any linked General Ledger Entries.
+	'''
+	query = """
+		SELECT
+			si.name
+		FROM
+			`tabSales Invoice` si
+		LEFT JOIN
+			`tabGL Entry` gle
+			ON gle.voucher_type = 'Sales Invoice'
+			AND gle.voucher_no = si.name
+		WHERE
+			si.docstatus = 1
+			AND gle.name IS NULL
+	"""
+	data = frappe.db.sql(query, as_dict=True)
+	sales_invoices = [si.name for si in data][:max_count]
+	for si in sales_invoices:
+		try:
+			si_doc = frappe.get_doc("Sales Invoice", si)
+			if si_doc.docstatus == 1:
+				si_doc.cancel()
+				si_doc.delete()
+		except Exception as e:
+			frappe.log_error(message=f"Error deleting Sales Invoice {si}: {str(e)}", title="Delete Sales Invoice")

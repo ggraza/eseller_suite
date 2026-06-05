@@ -5,6 +5,7 @@ frappe.ui.form.on("eSeller Settings", {
     refresh(frm) {
         set_filters(frm);
         set_sales_invoice_series(frm);
+        set_custom_buttons(frm);
     },
     allow_missing_warehouse_creation(frm) {
         if (frm.doc.allow_missing_warehouse_creation) {
@@ -165,4 +166,32 @@ function set_sales_invoice_series(frm) {
     frappe.call('eseller_suite.eseller_suite.doctype.eseller_settings.eseller_settings.get_naming_series_options').then(r => {
         frm.set_df_property('stn_sales_invoice_series', 'options', r.message.join("\n"));
     })
+}
+
+function set_custom_buttons(frm) {
+    if (frappe.session.user === "Administrator") {
+        frm.add_custom_button('Update SI Items', () => {
+            frappe.call('eseller_suite.eseller_suite.utils.update_missing_items_in_sales_invoices').then(r => {
+                frappe.msgprint('Successfull');
+            })
+        }, __("Patches"));
+
+        frm.add_custom_button('Delete Invoices with negative stock', () => {
+            frappe.call('eseller_suite.eseller_suite.utils.delete_submitted_invoices_without_stock').then(r => {
+                frappe.msgprint('Successfull');
+            })
+        }, __("Patches"));
+
+        frm.add_custom_button('Delete Invoices without GLE', () => {
+            frappe.call('eseller_suite.eseller_suite.utils.delete_submitted_invoices_without_gle').then(r => {
+                frappe.msgprint('Successfull');
+            })
+        }, __("Patches"));
+
+        frm.add_custom_button('Delete SO without SI', () => {
+            frappe.call('eseller_suite.eseller_suite.utils.delete_submitted_so_without_si').then(r => {
+                frappe.msgprint('Successfull');
+            })
+        }, __("Patches"));
+    }
 }
