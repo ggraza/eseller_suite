@@ -1118,7 +1118,6 @@ class AmazonRepository:
 						# Try to submit the draft invoice
 						try:
 							si_doc = frappe.get_doc("Sales Invoice", si)
-							si_doc.flags.ignore_validate = True
 							si_doc.submit()
 						except Exception as e:
 							frappe.log_error(
@@ -1179,7 +1178,7 @@ class AmazonRepository:
 						)
 						return_si.set_posting_time = 1
 				except Exception as e:
-					frappe.log_error(f"Error setting posting date for return invoice: {str(e)}")
+					frappe.log_error(message=f"Error setting posting date for return invoice: {str(e)}", title="Return Invoice - Posting Date Error")
 
 				return_si.is_return = 1
 				return_si.update_stock = 1

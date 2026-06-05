@@ -138,6 +138,7 @@ doc_events = {
 		"before_submit": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.before_submit",
 		"on_submit": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.on_submit",
 		"on_cancel": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.on_cancel",
+		"on_trash": "eseller_suite.eseller_suite.custom_script.sales_invoice.sales_invoice.on_trash",
 	},
 	'Purchase Receipt':{
 		"before_validate": "eseller_suite.eseller_suite.custom_script.purchase_receipt.purchase_receipt.create_barcodes",

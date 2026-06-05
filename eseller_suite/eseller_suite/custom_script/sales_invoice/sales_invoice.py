@@ -21,6 +21,13 @@ def after_insert(doc, method):
 	'''
 	delete_failed_sync_records(doc)
 
+def before_submit(doc, method):
+	'''
+		Method which get trgiggered in before_submit event
+	'''
+	if doc.replaced_order_id and doc.amazon_order_id:
+		create_stock_entry(doc.name)
+
 def on_submit(doc, method):
 	'''
 		Method which get trgiggered in on_submit event
@@ -52,12 +59,8 @@ def on_cancel(doc, method):
 			if item.sales_invoice_item and frappe.db.exists('Sales Invoice Item', item.sales_invoice_item):
 				frappe.db.set_value('Sales Invoice Item', item.sales_invoice_item, 'refunded', 0)
 
-def before_submit(doc, method):
-	'''
-		Method which get trgiggered in before_submit event
-	'''
-	if doc.replaced_order_id and doc.amazon_order_id:
-		create_stock_entry(doc.name)
+def on_trash(doc, method):
+	delete_failed_invoice_records(doc)
 
 def get_serial_nos(warehouse, item_code, qty):
 	"""
