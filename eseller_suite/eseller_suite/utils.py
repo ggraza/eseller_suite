@@ -187,13 +187,7 @@ def delete_submitted_invoices_without_stock(max_count=100):
 	sales_invoices = frappe.db.get_all('Stock Ledger Entry', filters=filters, pluck='voucher_no', limit_page_length=max_count)
 	sales_invoices = list(set(sales_invoices))  # Remove duplicates
 	for si in sales_invoices:
-		try:
-			si_doc = frappe.get_doc("Sales Invoice", si)
-			if si_doc.docstatus == 1:
-				si_doc.cancel()
-				si_doc.delete()
-		except Exception as e:
-			frappe.log_error(message=f"Error deleting Sales Invoice {si}: {str(e)}", title="Delete Sales Invoice")
+		cancel_and_delete_invoice(si)
 	return sales_invoices
 
 @frappe.whitelist()
@@ -248,10 +242,20 @@ def delete_submitted_invoices_without_gle(max_count=100):
 	data = frappe.db.sql(query, as_dict=True)
 	sales_invoices = [si.name for si in data][:max_count]
 	for si in sales_invoices:
+		cancel_and_delete_invoice(si)
+
+def cancel_and_delete_invoice(invoice_id):
+	'''
+		Cancel and delete a Sales Invoice by name.
+	'''
+	if frappe.db.exists('Sales Invoice', invoice_id):
 		try:
-			si_doc = frappe.get_doc("Sales Invoice", si)
+			si_doc = frappe.get_doc("Sales Invoice", invoice_id)
 			if si_doc.docstatus == 1:
+				return_si = frappe.db.get_value('Sales Invoice', filters={'return_against': invoice_id, 'docstatus': 1}, pluck='name')
+				if return_si:
+					cancel_and_delete_invoice(return_si)
 				si_doc.cancel()
 				si_doc.delete()
 		except Exception as e:
-			frappe.log_error(message=f"Error deleting Sales Invoice {si}: {str(e)}", title="Delete Sales Invoice")
+			frappe.log_error(message=f"Error deleting Sales Invoice {invoice_id}: {str(e)}", title="Delete Sales Invoice")

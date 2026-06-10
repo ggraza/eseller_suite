@@ -57,6 +57,8 @@
    "default": "Today",
    "fieldname": "posting_date",
    "fieldtype": "Date",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Posting Date",
    "reqd": 1
   },
@@ -130,7 +132,7 @@
    "link_fieldname": "cheque_no"
   }
  ],
- "modified": "2026-05-07 12:40:57.040340",
+ "modified": "2026-06-08 14:03:58.968775",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon Payment Entry",
