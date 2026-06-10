@@ -104,14 +104,14 @@ class AmazonPaymentEntry(Document):
 		total_pending_count = frappe.db.get_all('Amazon Payment Entry Item', { 'parent':self.name, 'ready_to_process':0 })
 		i = 0
 		for row in self.payment_details:
+			if row.order_id and not row.has_sales_order and frappe.db.exists('Sales Order', {'amazon_order_id':row.order_id, 'docstatus':['!=', 2]}):
+				row.has_sales_order = 1
+				has_changes = True
 			if not row.ready_to_process:
 				i += 1
 				frappe.publish_realtime("fetch_invoice_details", dict(progress=i, total=len(total_pending_count)))
 				row.company = self.company
 				if row.order_id and row.transaction_type in ['Order Payment', 'Amazon Easy Ship Charges', 'Fulfillment Fee Refund', 'Refund', 'Other']:
-					if not row.has_sales_order and frappe.db.exists('Sales Order', {'amazon_order_id':row.order_id, 'docstatus':['!=', 2]}):
-						row.has_sales_order = 1
-						has_changes = True
 					invoice_details = get_invoice_details(row.order_id, is_return=0, amount=row.total)
 					return_invoice_details = None
 					is_return = False
