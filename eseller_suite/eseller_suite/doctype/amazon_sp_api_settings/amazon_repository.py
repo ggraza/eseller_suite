@@ -332,7 +332,10 @@ class AmazonRepository:
 	def get_orders_instance(self) -> Orders:
 		return Orders(**self.instance_params)
 
-	def create_item(self, order_item, order_id) -> str:
+	def create_item(self, order_item, order_id, default_stock_uom=None) -> str:
+		if not default_stock_uom:
+			default_stock_uom = frappe.db.get_single_value("Stock Settings", "stock_uom") or "Nos"
+
 		def get_item_data(amazon_item):
 			"""Extract item data from either AttributeSets (old format) or summaries (new format)"""
 			if not amazon_item:
@@ -511,8 +514,6 @@ class AmazonRepository:
 		item.item_name = item_name if len(item_name) <= 140 else item_name[:100] + "..."
 		item.description = order_item.get('Title', '')
 
-		#Setting stock uom and default uom to default stock uom from stock settings
-		default_stock_uom = frappe.db.get_single_value("Stock Settings", "stock_uom")
 		if default_stock_uom:
 			item.stock_uom = default_stock_uom
 			item.uom = default_stock_uom
@@ -530,14 +531,19 @@ class AmazonRepository:
 
 		return item.name
 
-	def get_item_code(self, order_item, order_id) -> str:
+	def get_item_code(self, order_item, order_id, default_stock_uom=None) -> str:
 		item_code = None
 		item_asin = order_item.get("ASIN", '')
-		if frappe.db.exists("Item", {"amazon_item_code": item_asin}):
-			item_code = frappe.db.get_value("Item", {"amazon_item_code": item_asin})
-			if frappe.db.get_value("Item", item_code, "actual_item"):
-				item_code = frappe.db.get_value("Item", item_code, "actual_item")
+		result = frappe.db.get_value(
+			"Item",
+			{"amazon_item_code": item_asin},
+			["name", "actual_item"],
+			as_dict=True
+		)
+		if result:
+			item_code = result.actual_item or result.name
 			return item_code
+
 		if not self.amz_setting.create_item_if_not_exists:
 			# Record failed sync attempt
 			error_message = f"Failed to create Sales Order against Amazon Order ID : {order_id}. Item with ASIN : {order_item.get('ASIN')} and SKU : {order_item.get('SellerSKU')} not found."
@@ -548,7 +554,7 @@ class AmazonRepository:
 				failed_sync_record.save(ignore_permissions=True)
 			return None
 		try:
-			item_code = self.create_item(order_item, order_id)
+			item_code = self.create_item(order_item, order_id, default_stock_uom=default_stock_uom)
 		except Exception as e:
 			error_title = f"Item Creation Failed for Amazon Order : {order_id}"
 			error_message = f"Error creating item for SKU {order_item['SellerSKU']} and ASIN {order_item['ASIN']}: {str(e)}"
@@ -601,12 +607,9 @@ class AmazonRepository:
 						zero_qty_flag = True
 						actual_qty = order_item.get("ProductInfo").get("NumberOfItems")
 					item_rate = item_amount / item_qty
-					item_code = self.get_item_code(order_item, order_id)
+					item_code = self.get_item_code(order_item, order_id, default_stock_uom=default_stock_uom)
 					if not item_code:
 						return []
-					actual_item = frappe.db.get_value("Item", item_code, "actual_item")
-					if actual_item:
-						item_code = actual_item
 
 					# Get HSN code from Item master
 					item_hsn_code = frappe.db.get_value(
@@ -999,12 +1002,14 @@ class AmazonRepository:
 		refunds = get_refunds(self, order_id, order_date, amazon_order_amount)
 
 		items = self.get_order_items(order_id)
-		if frappe.db.exists("Sales Order", {"amazon_order_id": order_id}):
-			so_id, so_docstatus = frappe.db.get_value(
-				"Sales Order",
-				filters={"amazon_order_id": order_id},
-				fieldname=["name", "docstatus"],
-			)
+		so_result = frappe.db.get_value(
+			"Sales Order",
+			{"amazon_order_id": order_id},
+			["name", "docstatus"],
+			as_dict=True
+		)
+		so_id = so_result.name if so_result else None
+		so_docstatus = so_result.docstatus if so_result else 0
 
 		if so_id and refunds and so_docstatus:
 			si = frappe.db.exists(
@@ -1183,25 +1188,49 @@ class AmazonRepository:
 				return_si.is_return = 1
 				return_si.update_stock = 1
 				return_si.return_against = si
-				return_si.customer = frappe.db.get_value("Sales Invoice", si, "customer")
-				return_si.company = frappe.db.get_value("Sales Invoice", si, "company")
-				return_si.debit_to = frappe.db.get_value("Sales Invoice", si, "debit_to")
-				return_warehouse = frappe.db.get_value("Sales Invoice", si, "set_warehouse")
+				si_data = frappe.db.get_value(
+					"Sales Invoice", si,
+					["customer", "company", "debit_to", "set_warehouse", "fulfillment_channel", "status"],
+					as_dict=True
+				)
+				return_si.customer = si_data.customer
+				return_si.company  = si_data.company
+				return_si.debit_to = si_data.debit_to
+				return_warehouse   = si_data.set_warehouse
 				if self.amz_setting.temporary_stock_transfer_required:
 					return_warehouse = self.amz_setting.warehouse
-					si_fulfilement_channel = frappe.db.get_value("Sales Invoice", si, "fulfillment_channel")
+					si_fulfilement_channel = si_data.fulfillment_channel
 					if si_fulfilement_channel:
 						if si_fulfilement_channel == "AFN":
 							return_warehouse = self.amz_setting.afn_warehouse
 				return_si.set_warehouse = return_warehouse
 				return_si.amazon_order_id = order_id
 				# Set status from original sales invoice
-				si_status = frappe.db.get_value("Sales Invoice", si, "status")
+				si_status = si_data.status
 				if si_status:
 					return_si.status = si_status
 
 				# Process items for this refund
 				refund_items_processed = False
+				if existing_returns:
+					returned_qty_rows = frappe.db.get_all(
+						"Sales Invoice Item",
+						filters={"parent": ["in", existing_returns]},
+						fields=["item_code", "qty"]
+					)
+					returned_qty_map = {}
+					for row in returned_qty_rows:
+						returned_qty_map[row.item_code] = returned_qty_map.get(row.item_code, 0) + (row.qty or 0)
+				else:
+					returned_qty_map = {}
+
+				si_items_data = frappe.db.get_all(
+					"Sales Invoice Item",
+					filters={"parent": si},
+					fields=["name", "item_code", "qty", "rate", "gst_hsn_code"]
+				)
+				si_item_map = {row.item_code: row for row in si_items_data}
+
 				for item in refund.get("items", []):
 					if not item.get("item_code"):
 						continue
@@ -1213,74 +1242,24 @@ class AmazonRepository:
 					if not actual_item:
 						continue
 
-					returned_qty = 0
-					for returned_si in existing_returns:
-						existing_returned_qty = (
-							frappe.db.get_value(
-								"Sales Invoice Item",
-								{"parent": returned_si, "item_code": actual_item},
-								"qty",
-							)
-							or 0
-						)
-						returned_qty += existing_returned_qty
-
-					if not frappe.db.exists(
-						"Sales Invoice Item", {"parent": si, "item_code": actual_item}
-					):
-						continue
-
+					returned_qty = returned_qty_map.get(actual_item, 0)
 					item_qty = float(item.get("qty") or 0)
 					item_amount = float(item.get("amount") or 0)
-					original_qty = (
-						frappe.db.get_value(
-							"Sales Invoice Item",
-							{"parent": si, "item_code": actual_item},
-							"qty",
-						)
-						or 0
-					)
-
+					si_item = si_item_map.get(actual_item)
+					if not si_item:
+						continue
+					original_qty = si_item.qty or 0
 					if original_qty >= (returned_qty + item_qty):
-						# Calculate rate safely, handling None and division by zero
-						if item_qty and item_qty != 0:
-							rate = abs(item_amount / item_qty)
-						else:
-							# If qty is 0 or None, get rate from original invoice item
-							rate = (
-								frappe.db.get_value(
-									"Sales Invoice Item",
-									{"parent": si, "item_code": actual_item},
-									"rate",
-								)
-								or 0
-							)
-
-						# Get HSN code from original invoice item
-						original_item_hsn = frappe.db.get_value(
-							"Sales Invoice Item",
-							{"parent": si, "item_code": actual_item},
-							"gst_hsn_code",
-						)
-						if not original_item_hsn:
-							# Fallback to Item master
-							original_item_hsn = frappe.db.get_value(
-								"Item", actual_item, "gst_hsn_code"
-							)
+						rate = abs(item_amount / item_qty) if item_qty else (si_item.rate or 0)
+						original_item_hsn = si_item.gst_hsn_code or frappe.db.get_value("Item", actual_item, "gst_hsn_code")
 
 						return_item = {
 							"item_code": actual_item,
 							"qty": -1 * item_qty,
 							"rate": rate,
 							"sales_order": so_id,
-							"sales_invoice_item": frappe.db.get_value(
-								"Sales Invoice Item",
-								{"parent": si, "item_code": actual_item},
-								"name",
-							),
+							"sales_invoice_item": si_item.name,
 						}
-
-						# Add HSN code if available
 						if original_item_hsn:
 							return_item["gst_hsn_code"] = original_item_hsn
 
@@ -1351,19 +1330,21 @@ class AmazonRepository:
 			so.amazon_order_status = order.get("OrderStatus")
 			so.fulfillment_channel = order.get("FulfillmentChannel")
 			so.replaced_order_id = order.get("ReplacedOrderId") or ""
-			buyer_info = self.call_sp_api_method(
-				sp_api_method=self.get_orders_instance().get_buyer_info,
-				order_id=order_id
-			)
 			customer_name = ''
-			if buyer_info.get('BuyerTaxInfo', {}).get('CompanyLegalName'):
-				customer_name = buyer_info.get('BuyerTaxInfo', {}).get('CompanyLegalName')
-			customer = create_customer(order, customer_name)
 			if order.get("IsBusinessOrder"):
 				so.amazon_customer_type = "B2B"
-				create_address(order, customer, self.amz_setting.map_state_data)
+				buyer_info = self.call_sp_api_method(
+					sp_api_method=self.get_orders_instance().get_buyer_info,
+					order_id=order_id
+				)
+				customer_name = (buyer_info or {}).get('BuyerTaxInfo', {}).get('CompanyLegalName', '')
 			else:
 				so.amazon_customer_type = "B2C"
+
+			customer = create_customer(order, customer_name)
+
+			if order.get("IsBusinessOrder"):
+				create_address(order, customer, self.amz_setting.map_state_data)
 			if amazon_order_amount:
 				so.amazon_order_amount = amazon_order_amount
 			so.amazon_order_status = order.get("OrderStatus")
@@ -1619,7 +1600,6 @@ class AmazonRepository:
 
 				if order_status_valid and has_taxes and transfer_exists and fc_data_exists:
 					try:
-						so.save(ignore_permissions=True)
 						so.submit()
 					except Exception as e:
 						error_msg = str(e)
