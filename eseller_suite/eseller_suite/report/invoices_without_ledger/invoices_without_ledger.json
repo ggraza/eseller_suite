@@ -1,0 +1,52 @@
+{
+ "add_total_row": 0,
+ "add_translate_data": 0,
+ "columns": [
+  {
+   "fieldname": "name",
+   "fieldtype": "Link",
+   "label": "Sales Invoice",
+   "options": "Sales Invoice",
+   "width": 250
+  },
+  {
+   "fieldname": "posting_date",
+   "fieldtype": "Date",
+   "label": "Posting Date",
+   "width": 250
+  },
+  {
+   "fieldname": "grand_total",
+   "fieldtype": "Currency",
+   "label": "Grand Total",
+   "width": 250
+  }
+ ],
+ "creation": "2026-06-02 12:47:00.749404",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-06-11 13:17:37.169902",
+ "modified_by": "Administrator",
+ "module": "eSeller Suite",
+ "name": "Invoices without Ledger",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT\n    si.name,\n    si.posting_date,\n    si.grand_total\nFROM\n    `tabSales Invoice` si\nLEFT JOIN\n    `tabGL Entry` gle\n    ON gle.voucher_type = 'Sales Invoice'\n    AND gle.voucher_no = si.name\nWHERE\n    si.docstatus = 1\n    AND gle.name IS NULL\nORDER BY\n    si.posting_date DESC;",
+ "ref_doctype": "Sales Invoice",
+ "report_name": "Invoices without Ledger",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  }
+ ],
+ "timeout": 0
+}
