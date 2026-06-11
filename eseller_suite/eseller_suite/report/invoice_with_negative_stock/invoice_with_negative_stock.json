@@ -8,6 +8,26 @@
    "label": "Sales Invoice",
    "options": "Sales Invoice",
    "width": 250
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item",
+   "width": 250
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "width": 250
+  },
+  {
+   "fieldname": "actual_qty",
+   "fieldtype": "Float",
+   "label": "Qty",
+   "width": 0
   }
  ],
  "creation": "2026-06-11 13:20:39.062412",
@@ -19,13 +39,13 @@
  "is_standard": "Yes",
  "json": "{}",
  "letter_head": null,
- "modified": "2026-06-11 13:26:08.258842",
+ "modified": "2026-06-11 14:10:55.294416",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Invoice with negative stock",
  "owner": "Administrator",
  "prepared_report": 0,
- "query": "SELECT\n\tsle.voucher_no\nFROM\n\t`tabSales Invoice` sle\nWHERE\n\tsle.voucher_type = 'Sales Invoice'\n\tAND sle.qty_after_transaction < 0\n\tAND sle.is_cancelled = 0",
+ "query": "SELECT\n\tsle.voucher_no,\n\tsle.item_code,\n\tsle.warehouse,\n\tsle.actual_qty\nFROM\n\t`tabStock Ledger Entry` sle\nWHERE\n\tsle.voucher_type = 'Sales Invoice'\n\tAND sle.qty_after_transaction < 0\n\tAND sle.is_cancelled = 0",
  "ref_doctype": "Sales Invoice",
  "report_name": "Invoice with negative stock",
  "report_type": "Query Report",

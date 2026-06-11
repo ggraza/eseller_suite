@@ -190,13 +190,12 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Submitted SO without SI",
    "link_count": 0,
    "link_to": "Submitted SO without SI",
    "link_type": "Report",
    "onboard": 0,
-   "report_ref_doctype": "Sales Order",
    "type": "Link"
   },
   {
@@ -211,17 +210,16 @@
   },
   {
    "hidden": 0,
-   "is_query_report": 0,
+   "is_query_report": 1,
    "label": "Duplicate Sales Order Check",
    "link_count": 0,
    "link_to": "Duplicate Sales Order Check",
    "link_type": "Report",
    "onboard": 0,
-   "report_ref_doctype": "Sales Order",
    "type": "Link"
   }
  ],
- "modified": "2026-06-11 13:27:24.529691",
+ "modified": "2026-06-11 14:13:44.822882",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "eSeller Suite",
