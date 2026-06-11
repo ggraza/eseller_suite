@@ -1125,11 +1125,12 @@ class AmazonRepository:
 							si_doc = frappe.get_doc("Sales Invoice", si)
 							si_doc.submit()
 						except Exception as e:
+							frappe.db.rollback()
 							frappe.log_error(
 								title="Return Invoice - Failed to Submit Draft Invoice",
 								message=f"Order ID: {order_id}, Invoice: {si}, Error: {str(e)}",
 							)
-							# Continue anyway, we'll try to create return against draft invoice
+							return
 
 				if not si:
 					# Check if failed sync record already exists for this order_id with similar return invoice error
