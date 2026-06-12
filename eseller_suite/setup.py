@@ -787,6 +787,15 @@ def get_stock_entry_custom_fields():
 				"depends_on": 'eval: doc.bundle_items && doc.bundle_items.length',
 				"insert_after": "bundle_details_column",
 			},
+			{
+				"fieldname": "ignore_bundle_difference",
+				"fieldtype": "Check",
+				"label": "Ignore Bundle Difference",
+				"no_copy": 1,
+				"default": 0,
+				"depends_on": 'eval: doc.bundle_difference_amount',
+				"insert_after": "apply_putaway_rule",
+			},
 		]
 	}
 
