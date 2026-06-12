@@ -17,6 +17,7 @@
   "parent_warehouses",
   "amazon_payment_entry_configs_tab",
   "max_invoice_count",
+  "opening_date",
   "column_break_dcwj",
   "default_mode_of_payment",
   "section_break_znhz",
@@ -212,13 +213,20 @@
    "fieldname": "stn_sales_invoice_series",
    "fieldtype": "Select",
    "label": "Sales Invoice Series"
+  },
+  {
+   "description": "Invoices dated before this date will not be created and will be excluded from payment processing.\n",
+   "fieldname": "opening_date",
+   "fieldtype": "Date",
+   "label": "Opening Date",
+   "reqd": 1
   }
  ],
  "hide_toolbar": 1,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-05-05 13:32:44.823589",
+ "modified": "2026-06-12 15:08:36.968657",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "eSeller Settings",

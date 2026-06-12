@@ -238,7 +238,7 @@ function set_introduction_texts(frm) {
 		const total_count = frm.doc.payment_details ? frm.doc.payment_details.length : 0;
 		// Get rows where checkbox is NOT checked
 		const remaining_rows = (frm.doc.payment_details || []).filter(
-			row => !row.ready_to_process
+			row => !row.ready_to_process && !row.ignore_transaction
 		);
 		// Remaining unchecked rows count
 		const remaining_count = remaining_rows.length;

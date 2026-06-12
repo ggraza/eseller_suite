@@ -11,6 +11,8 @@ from erpnext.selling.doctype.sales_order.sales_order import SalesOrder
 from erpnext.setup.doctype.item_group.item_group import get_item_group_defaults
 from erpnext.stock.doctype.item.item import get_item_defaults
 
+from eseller_suite.eseller_suite.utils import is_old_data
+
 import re
 
 class SalesOrderOverride(SalesOrder):
@@ -61,12 +63,14 @@ class SalesOrderOverride(SalesOrder):
 
 	def on_submit(self):
 		super(SalesOrderOverride, self).on_submit()
-		
-		sales_invoice = make_sales_invoice(source_name=self.name, target_doc=None, ignore_permissions=True)
-		sales_invoice.update_stock = 1
-		sales_invoice.insert(ignore_permissions=True)
 
-		self.update_shipment_logs(submit=1)
+		# ignore Invoice Creation for old orders
+		if is_old_data(self.transaction_date):
+			sales_invoice = make_sales_invoice(source_name=self.name, target_doc=None, ignore_permissions=True)
+			sales_invoice.update_stock = 1
+			sales_invoice.insert(ignore_permissions=True)
+
+			self.update_shipment_logs(submit=1)
 
 	def on_update(self):
 		self.update_shipment_logs()
