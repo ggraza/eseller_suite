@@ -65,7 +65,7 @@ class SalesOrderOverride(SalesOrder):
 		super(SalesOrderOverride, self).on_submit()
 
 		# ignore Invoice Creation for old orders
-		if is_old_data(self.transaction_date):
+		if not is_old_data(self.transaction_date):
 			sales_invoice = make_sales_invoice(source_name=self.name, target_doc=None, ignore_permissions=True)
 			sales_invoice.update_stock = 1
 			sales_invoice.insert(ignore_permissions=True)
