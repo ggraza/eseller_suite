@@ -11,9 +11,7 @@ from charset_normalizer import from_path
 from frappe.model.document import Document
 from frappe.utils import get_url_to_form
 
-from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository import (
-	get_order,
-)
+from eseller_suite.eseller_suite.utils import is_old_data
 
 
 class AmazonPaymentEntry(Document):
@@ -106,6 +104,9 @@ class AmazonPaymentEntry(Document):
 		for row in self.payment_details:
 			if row.order_id and not row.has_sales_order and frappe.db.exists('Sales Order', {'amazon_order_id':row.order_id, 'docstatus':['!=', 2]}):
 				row.has_sales_order = 1
+				transaction_date = frappe.db.get_value('Sales Order', {'amazon_order_id':row.order_id, 'docstatus':['!=', 2]}, 'transaction_date')
+				if is_old_data(transaction_date):
+					row.ignore_transaction = 1
 				has_changes = True
 			if not row.ready_to_process:
 				i += 1
@@ -157,6 +158,9 @@ class AmazonPaymentEntry(Document):
 							if row.sales_invoice and row.customer:
 								row.ready_to_process = 1
 								has_changes = True
+						elif row.sales_invoice and row.customer:
+							row.ready_to_process = 1
+							has_changes = True
 				if row.transaction_type in ['Other', 'Inventory Reimbursement'] and row.product_details in ['FBA Inventory Reimbursement', 'FBA Reversed Reimbursement'] and row.order_id == '---':
 					if float(row.total) < 0:
 						inventory_reimbursement_account = get_account_based_on_company(row.company, 'inventory_reimbursement_account')
@@ -353,7 +357,6 @@ class AmazonPaymentEntry(Document):
 		'''
 			Method to trigger Sales Invoice Submission RQ Job
 		'''
-		print("\n\n\n\n Submitting Invoices in background \n\n\n\n")
 		frappe.enqueue("eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings.enq_si_submit", queue="long")
 		return 1 #for client side to know that the job has been triggered
 
@@ -375,7 +378,7 @@ class AmazonPaymentEntry(Document):
 			Validate whether all rows are processed before submission.
 		'''
 		remaining_count = sum(
-			1 for row in self.payment_details if not row.ready_to_process
+			1 for row in self.payment_details if not (row.ready_to_process or row.ignore_transaction)
 		)
 
 		if remaining_count:
@@ -426,8 +429,10 @@ def get_account_based_on_company(company, account_type):
 		'inventory_reimbursement_income_account',
 		'other_expenses_account',
 		'other_income_account',
-		'order_cancellation_account'
+		'order_cancellation_account',
+		'mop_account'
 	]
 	if account_type in account_types:
 		account = frappe.db.get_value('Amazon Payment Account', { 'company': company, 'parent': 'eSeller Settings', }, account_type)
 	return account
+

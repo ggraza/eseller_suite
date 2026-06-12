@@ -4,7 +4,8 @@ from datetime import datetime
 
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import flt, getdate
+from erpnext.accounts.utils import get_fiscal_year
 
 def format_date_time_to_ist(utc_time_str):
 	# Parse the UTC time string
@@ -259,3 +260,19 @@ def cancel_and_delete_invoice(invoice_id):
 				si_doc.delete()
 		except Exception as e:
 			frappe.log_error(message=f"Error deleting Sales Invoice {invoice_id}: {str(e)}", title="Delete Sales Invoice")
+
+def is_old_data(transaction_date):
+	'''
+		Method to check wether the data is from old date before opening entry is done.
+		Will be using date threshold from Configuration
+	'''
+	opening_date = frappe.db.get_single_value('eSeller Settings', 'opening_date')
+	if not opening_date:
+		return False
+	opening_date = getdate(opening_date)
+	transaction_date = getdate(transaction_date)
+	op_fy = get_fiscal_year(opening_date)
+	tr_fy = get_fiscal_year(transaction_date)
+	if tr_fy[1] < op_fy[1]:
+		return True
+	return False

@@ -9,7 +9,7 @@
   "company",
   "inventory_reimbursement_income_account",
   "other_income_account",
-  "amazon_reserve_fund",
+  "amazon_reserve_fund_account",
   "column_break_rsvl",
   "mode_of_payment",
   "inventory_reimbursement_account",
@@ -118,7 +118,7 @@
   },
   {
    "description": "This account will be used for Amazon Reserve fund",
-   "fieldname": "amazon_reserve_fund",
+   "fieldname": "amazon_reserve_fund_account",
    "fieldtype": "Link",
    "label": "Amazon Reserve Fund Account",
    "options": "Account"
@@ -128,7 +128,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-03-17 16:38:38.636032",
+ "modified": "2026-06-12 13:53:11.028514",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon Payment Account",

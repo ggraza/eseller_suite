@@ -13,7 +13,7 @@ frappe.ui.form.on("Amazon Failed Sync Record", {
 
 function handle_custom_buttons(frm) {
 	if (!frm.is_new()) {
-		if (frm.doc.amazon_order_id && !frm.doc.replaced_order_id && !frm.doc.is_multi_company_exception) {
+		if (frm.doc.amazon_order_id && !frm.doc.replaced_order_id && !frm.doc.is_multi_company_exception && frm.doc.grand_total > 0) {
 			frm.add_custom_button('Retry', () => {
 				retry_fetching(frm);
 			}).addClass("btn-primary");
@@ -24,7 +24,7 @@ function handle_custom_buttons(frm) {
 					.then(r => { // checking if the replaced jv is already created from another source
 						if (!r.message.name) {
 							frm.add_custom_button('Journal Entry', () => {
-								create_replaced_jv(frm);
+								create_jv(frm, 'create_replaced_jv');
 							}, 'Create');
 						}
 					})
@@ -34,11 +34,31 @@ function handle_custom_buttons(frm) {
 					.then(r => { // checking if the replaced so is already created from another source
 						if (!r.message.name) {
 							frm.add_custom_button('Sales Order', () => {
-								create_replaced_so(frm);
+								create_so(frm, 'create_replaced_so');
 							}, 'Create');
 						}
 					})
 			}
+		}
+		else if (frm.doc.grand_total < 0) {
+			frappe.db.get_value('Journal Entry', { amazon_order_id: frm.doc.amazon_order_id }, 'name').then(r => {
+				// checking if the adjustment jv is already created from another source
+				if (!r.message.name) {
+					frm.add_custom_button('Journal Entry', () => {
+						create_jv(frm, 'create_adjustment_jv');
+					}, 'Create');
+				}
+				else {
+					frappe.db.get_value('Sales Order', { amazon_order_id: frm.doc.amazon_order_id }, 'name').then(r => {
+						// checking if the adjustment so is already created from another source
+						if (!r.message.name) {
+							frm.add_custom_button('Sales Order', () => {
+								create_so(frm, 'create_adjustment_so');
+							}, 'Create');
+						}
+					})
+				}
+			})
 		}
 	}
 }
@@ -85,9 +105,9 @@ function retry_fetching(frm) {
 	}
 }
 
-function create_replaced_so(frm) {
+function create_so(frm, method) {
 	frm.call({
-		method: "create_replaced_so",
+		method: method,
 		doc: frm.doc,
 		freeze: true,
 		freeze_message: __("Creating Replaced Sales Order.."),
@@ -101,9 +121,9 @@ function create_replaced_so(frm) {
 	});
 }
 
-function create_replaced_jv(frm) {
+function create_jv(frm, method) {
 	frm.call({
-		method: "create_replaced_jv",
+		method: method,
 		doc: frm.doc,
 		freeze: true,
 		freeze_message: __("Creating Adjustment Journal Entry.."),

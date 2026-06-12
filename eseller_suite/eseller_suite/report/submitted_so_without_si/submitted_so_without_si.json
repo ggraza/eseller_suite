@@ -14,6 +14,12 @@
    "fieldtype": "Data",
    "label": "Amazon Order ID",
    "width": 250
+  },
+  {
+   "fieldname": "transaction_date",
+   "fieldtype": "Date",
+   "label": "Transaction Date",
+   "width": 0
   }
  ],
  "creation": "2026-06-10 17:41:40.841955",
@@ -24,13 +30,13 @@
  "idx": 0,
  "is_standard": "Yes",
  "letter_head": null,
- "modified": "2026-06-11 13:16:07.688905",
+ "modified": "2026-06-12 16:18:39.143268",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Submitted SO without SI",
  "owner": "Administrator",
  "prepared_report": 0,
- "query": "SELECT\n\tso.name,\n\tso.amazon_order_id\nFROM\n\t`tabSales Order` so\nLEFT JOIN\n\t`tabSales Invoice Item` sii\n\tON sii.sales_order = so.name\nLEFT JOIN\n\t`tabSales Invoice` si\n\tON si.name = sii.parent\nWHERE\n\tso.docstatus = 1\n\tAND si.name IS NULL;",
+ "query": "SELECT\n\tso.name,\n\tso.amazon_order_id,\n\tso.transaction_date\nFROM\n\t`tabSales Order` so\nLEFT JOIN\n\t`tabSales Invoice Item` sii\n\tON sii.sales_order = so.name\nLEFT JOIN\n\t`tabSales Invoice` si\n\tON si.name = sii.parent\nWHERE\n\tso.docstatus = 1\n\tAND si.name IS NULL;",
  "ref_doctype": "Sales Order",
  "report_name": "Submitted SO without SI",
  "report_type": "Query Report",

@@ -113,3 +113,57 @@ class AmazonFailedSyncRecord(Document):
 				jv_doc.submit()
 				frappe.db.set_value(self.doctype, self.name, 'replaced_jv', jv_doc.name)
 				frappe.msgprint('Journal Entry Created: <a href="{0}">{1}</a>'.format(get_url_to_form(jv_doc.doctype, jv_doc.name), jv_doc.name), alert=True, indicator='green')
+
+	@frappe.whitelist()
+	def create_adjustment_jv(self):
+		'''
+			Adjustment JV in case of -ve orders, due to high charges and less invoice value
+		'''
+		data = json.loads(self.payload)
+		jv_doc = frappe.new_doc('Journal Entry')
+		jv_doc.voucher_type = 'Journal Entry'
+		jv_doc.posting_date = self.posting_date
+		jv_doc.user_remark = 'Adjustment Entry for Replaced Order'
+		jv_doc.amazon_order_id = self.amazon_order_id
+		total_tax_amount = 0
+		if data.get('taxes'):
+			for row in data.get('taxes'):
+				if float(row.get('tax_amount'))<0:
+					tax_amount = abs(float(row.get('tax_amount')))
+					total_tax_amount += tax_amount
+					jv_row = jv_doc.append('accounts')
+					jv_row.account = row.get('account_head')
+					jv_row.debit = tax_amount
+					jv_row.debit_in_account_currency = tax_amount
+					jv_row.user_remark = row.get('description')
+					jv_row.amazon_order_id = self.amazon_order_id
+		if data.get('customer') and data.get('company') and total_tax_amount:
+			default_receivable_account = frappe.db.get_value('Company', data.get('company'), 'default_receivable_account')
+			jv_row = jv_doc.append('accounts')
+			jv_row.credit = total_tax_amount
+			jv_row.credit_in_account_currency = total_tax_amount
+			jv_row.user_remark = 'Adjustment Entry for Replaced Order'
+			jv_row.amazon_order_id = self.amazon_order_id
+			jv_row.party_type = 'Customer'
+			jv_row.party = data.get('customer')
+			jv_row.account = default_receivable_account
+			jv_doc.flags.ignore_mandatory = True
+			jv_doc.save(ignore_permissions=True)
+			jv_doc.submit()
+			frappe.msgprint('Journal Entry Created: <a href="{0}">{1}</a>'.format(get_url_to_form(jv_doc.doctype, jv_doc.name), jv_doc.name), alert=True, indicator='green')
+
+	@frappe.whitelist()
+	def create_adjustment_so(self):
+		data = json.loads(self.payload)
+		so_doc = frappe.get_doc(data)
+		so_doc.taxes = []
+		for row in data.get('taxes'):
+			if float(row.get('tax_amount'))>0:
+				so_doc.append('taxes', row)
+		so_doc.flags.ignore_mandatory = True
+		so_doc.disable_rounded_total = 1
+		so_doc.custom_validate()
+		so_doc.save(ignore_permissions=True)
+		if so_doc.amazon_order_status == 'Shipped':
+			so_doc.submit()
+		frappe.msgprint('Sales Order Created: <a href="{0}">{1}</a>'.format(get_url_to_form(so_doc.doctype, so_doc.name), so_doc.name), alert=True, indicator='green')
