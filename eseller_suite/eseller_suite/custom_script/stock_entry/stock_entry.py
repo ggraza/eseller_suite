@@ -98,6 +98,8 @@ def validate_bundle_amount_difference(doc):
 	"""
 	Method to validate bundle difference amount on submission of stock entry
 	"""
+	if doc.ignore_bundle_difference:
+		return
 	if doc.bundle_difference_amount >=1 or doc.bundle_difference_amount <= -1:
 		title = 'Check Difference Amount'
 		msg = 'Cannot submit the stock entry due to difference amount of {0} for bundle items'.format(frappe.bold(doc.bundle_difference_amount))
