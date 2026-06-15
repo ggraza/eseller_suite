@@ -25,8 +25,9 @@ def before_submit(doc, method):
 	'''
 		Method which get trgiggered in before_submit event
 	'''
-	if doc.replaced_order_id and doc.amazon_order_id:
-		create_stock_entry(doc.name)
+	pass
+	# if doc.replaced_order_id and doc.amazon_order_id:
+	# 	create_stock_entry(doc.name)
 
 def on_submit(doc, method):
 	'''
