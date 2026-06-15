@@ -368,6 +368,7 @@ class AmazonPaymentEntry(Document):
 			row.has_sales_order = 0
 			row.sales_invoice = ''
 			row.return_sales_invoice = ''
+			row.journal_entry = ''
 			row.company = ''
 			row.amazon_expense_account = ''
 			row.customer = ''

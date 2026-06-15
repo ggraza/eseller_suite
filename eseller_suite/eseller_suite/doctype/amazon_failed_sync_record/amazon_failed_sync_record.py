@@ -142,7 +142,7 @@ class AmazonFailedSyncRecord(Document):
 			jv_row = jv_doc.append('accounts')
 			jv_row.credit = total_tax_amount
 			jv_row.credit_in_account_currency = total_tax_amount
-			jv_row.user_remark = 'Adjustment Entry for Replaced Order'
+			jv_row.user_remark = 'Adjustment Entry for -ve Order Value'
 			jv_row.amazon_order_id = self.amazon_order_id
 			jv_row.party_type = 'Customer'
 			jv_row.party = data.get('customer')
