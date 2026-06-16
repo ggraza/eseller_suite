@@ -99,7 +99,7 @@ class AmazonPaymentEntry(Document):
 			Method to get fetch Invoice and Customer details against each Amazon Order IDs
 		'''
 		has_changes = False
-		total_pending_count = frappe.db.get_all('Amazon Payment Entry Item', { 'parent':self.name, 'ready_to_process':0 })
+		total_pending_count = frappe.db.get_all('Amazon Payment Entry Item', { 'parent':self.name, 'ready_to_process':0, 'ignore_transaction':0 })
 		i = 0
 		for row in self.payment_details:
 			if row.order_id and not row.has_sales_order and frappe.db.exists('Sales Order', {'amazon_order_id':row.order_id, 'docstatus':['!=', 2]}):
