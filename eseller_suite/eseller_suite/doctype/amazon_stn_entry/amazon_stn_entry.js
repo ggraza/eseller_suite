@@ -14,6 +14,9 @@ frappe.ui.form.on("Amazon STN Entry", {
 			frm.clear_table("stn_entries");
 			frm.refresh_field("stn_entries");
 		}
+	},
+	summarise_and_download(frm) {
+		handle_download_exception(frm);
 	}
 });
 
@@ -43,6 +46,7 @@ function set_error_messages_html(frm) {
 			var data = r.message;
 			$(frm.fields_dict['error_messages_html'].wrapper).html(data);
 			frm.refresh_fields();
+			frm.set_df_property('summarise_and_download', 'hidden', 0);
 		}
 		else {
 			frm.set_df_property('section_break_ijoc', 'hidden', 1);
@@ -63,4 +67,11 @@ function hanlde_retry_btn(frm) {
 			})
 		})
 	}
+}
+
+function handle_download_exception(frm) {
+	open_url_post(frappe.request.url, {
+		cmd: "eseller_suite.eseller_suite.doctype.amazon_stn_entry.amazon_stn_entry.export_stock_exceptions",  // adjust to your module path
+		stn_entry_name: frm.doc.name
+	});
 }

@@ -16,7 +16,8 @@
   "section_break_rozl",
   "stn_entries",
   "section_break_ijoc",
-  "error_messages_html"
+  "error_messages_html",
+  "summarise_and_download"
  ],
  "fields": [
   {
@@ -85,13 +86,19 @@
    "print_hide": 1,
    "read_only": 1,
    "report_hide": 1
+  },
+  {
+   "fieldname": "summarise_and_download",
+   "fieldtype": "Button",
+   "hidden": 1,
+   "label": "Summarise and Download"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-07 12:44:37.665856",
+ "modified": "2026-06-17 13:53:37.710485",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon STN Entry",
