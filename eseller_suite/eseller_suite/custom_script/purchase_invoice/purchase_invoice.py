@@ -24,6 +24,12 @@ def on_submit(doc, method):
 	if doc.amazon_invoice_id:
 		unset_stn_exception(doc)
 
+def on_update_after_submit(doc, method):
+	'''
+		Method which trigger on on_update_after_submit event of Purchase Invoice
+	'''
+	unset_stn_exception(doc)
+
 def on_cancel(doc, method):
 	'''
 		Method which trigger on on_cancel event of Purchase Invoice
@@ -83,5 +89,13 @@ def unset_stn_exception(doc):
 	'''
 	if frappe.db.exists('Amazon STN Entry Item', {'purchase_invoice': doc.name}):
 		stn_entry_item, si_ref  = frappe.db.get_value('Amazon STN Entry Item', {'purchase_invoice': doc.name}, ['name', 'sales_invoice'])
-		if frappe.db.get_value('Sales Invoice', si_ref, 'docstatus') == 1:
-			frappe.db.set_value('Amazon STN Entry Item', stn_entry_item, 'error_log', '')
+		frappe.db.set_value('Amazon STN Entry Item', stn_entry_item, 'error_log', '')
+		frappe.db.commit()
+		if frappe.db.get_value('Sales Invoice', si_ref, 'docstatus') == 0:
+			try:
+				si_doc = frappe.get_doc('Sales Invoice', si_ref)
+				si_doc.submit()
+			except Exception as e:
+				frappe.db.rollback()
+				exception_msg = f"Failed to submit Sales Invoice: {si_ref} - {str(e)}"
+				frappe.db.set_value('Amazon STN Entry Item', stn_entry_item, 'error_log', exception_msg, update_modified=False)

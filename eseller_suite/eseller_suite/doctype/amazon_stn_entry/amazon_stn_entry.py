@@ -1,15 +1,20 @@
 # Copyright (c) 2026, efeone and contributors
 # For license information, please see license.txt
 import frappe
-from frappe.utils import get_datetime, flt
+from frappe.utils import flt
 from frappe.model.document import Document
 from frappe.core.doctype.submission_queue.submission_queue import queue_submission
 
 import os
+import re
 import csv
-from charset_normalizer import from_path
-from eseller_suite.eseller_suite.utils import add_bundle_components_to_stock_entry, get_bundle_items
+from bs4 import BeautifulSoup
 from datetime import datetime
+from charset_normalizer import from_path
+from frappe.utils.xlsxutils import make_xlsx
+
+from eseller_suite.eseller_suite.utils import add_bundle_components_to_stock_entry, get_bundle_items
+
 
 class AmazonSTNEntry(Document):
 	def submit(self):
@@ -958,3 +963,47 @@ def submit_transactions(stn_entry_name):
 						if stn_row.error_log:
 							exception_msg = f"{stn_row.error_log}\n{exception_msg}"
 						frappe.db.set_value(stn_row.doctype, stn_row.name, "error_log", exception_msg, update_modified=False)
+
+@frappe.whitelist()
+def export_stock_exceptions(stn_entry_name):
+	if not frappe.db.exists('Amazon STN Entry', stn_entry_name):
+		frappe.throw(f"Amazon STN Entry '{stn_entry_name}' does not exist.")
+		return
+
+	doc = frappe.get_doc("Amazon STN Entry", stn_entry_name)
+	html_content = doc.get_error_message_html()
+	if not html_content:
+		frappe.throw("No exception log found to parse")
+
+	# Strip HTML tags but keep the link text (Item/Warehouse names)
+	soup = BeautifulSoup(html_content, "html.parser")
+	for br in soup.find_all("br"):
+		br.replace_with("\n")
+	text = soup.get_text()
+
+	pattern = re.compile(
+		r"Row\s+\d+:\s*(?P<exception>.*?):\s*"
+		r"(?P<txn>[\w\-]+)\s*-\s*(?P<qty>[\d.]+)\s*units of\s*"
+		r"Item\s+(?P<item>[\w\-]+):.*?needed in\s+"
+		r"Warehouse\s+(?P<warehouse>.*?)\s+to complete this transaction",
+		re.IGNORECASE
+	)
+
+	rows = [["Exception", "Transaction ID", "Item", "Qty", "Warehouse"]]
+	for m in pattern.finditer(text):
+		rows.append([
+			m.group("exception").strip(),
+			m.group("txn").strip(),
+			m.group("item").strip(),
+			float(m.group("qty")),
+			m.group("warehouse").strip(),
+		])
+
+	if len(rows) == 1:
+		frappe.throw("No stock exceptions could be parsed from the log")
+
+	xlsx_file = make_xlsx(rows, "Stock Exceptions")
+
+	frappe.response["filename"] = "stock_exceptions_{0}.xlsx".format(stn_entry_name)
+	frappe.response["filecontent"] = xlsx_file.getvalue()
+	frappe.response["type"] = "binary"
