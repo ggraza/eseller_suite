@@ -114,3 +114,12 @@ def fetch_sales_orders(docnames):
 
 	orders = get_orders(amz_setting_name=amz_setting_name, last_updated_after=last_updated_after, amazon_order_ids=amazon_order_ids)
 	return orders
+
+@frappe.whitelist()
+def get_sales_order_item_codes(amazon_order_id):
+	sales_order = frappe.db.get_value("Sales Order", {"amazon_order_id": amazon_order_id}, "name")
+
+	if not sales_order:
+		return []
+
+	return frappe.get_all("Sales Order Item", filters={"parent": sales_order}, pluck="item_code")
