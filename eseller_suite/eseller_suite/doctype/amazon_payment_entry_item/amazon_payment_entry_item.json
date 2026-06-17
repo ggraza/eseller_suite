@@ -36,7 +36,7 @@
    "reqd": 1
   },
   {
-   "columns": 3,
+   "columns": 2,
    "fieldname": "order_id",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -44,7 +44,7 @@
    "read_only": 1
   },
   {
-   "columns": 2,
+   "columns": 1,
    "fieldname": "total",
    "fieldtype": "Currency",
    "in_list_view": 1,
@@ -150,6 +150,7 @@
    "read_only": 1
   },
   {
+   "columns": 1,
    "default": "0",
    "fieldname": "ignore_transaction",
    "fieldtype": "Check",
@@ -160,7 +161,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-12 14:41:53.254353",
+ "modified": "2026-06-15 17:28:47.408181",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon Payment Entry Item",
