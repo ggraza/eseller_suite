@@ -82,6 +82,9 @@ function hanlde_update_item_btn(frm) {
 			frm.add_custom_button('Update Item', () => {
 				update_item_popup(frm, item_codes);
 			});
+			frm.add_custom_button('Update Sales Order Item', () => {
+				open_update_so_item_dialog(frm);
+			});
 		}
 	});
 }
@@ -129,4 +132,90 @@ function update_item_popup(frm, item_codes) {
 		}
 	});
 	d.show();
+}
+
+function open_update_so_item_dialog(frm) {
+	if (!frm.doc.amazon_order_id) {
+		frappe.msgprint(__('Amazon Order ID is not set on this record.'));
+		return;
+	}
+
+	//Find the Sales Order using amazon_order_id
+	frappe.db.get_value('Sales Order', { amazon_order_id: frm.doc.amazon_order_id }, 'name').then(r => {
+		const sales_order = r.message && r.message.name;
+
+		if (!sales_order) {
+			frappe.msgprint(__('No Sales Order found with Amazon Order ID: {0}', [frm.doc.amazon_order_id]));
+			return;
+		}
+
+		show_dialog(frm, sales_order);
+	});
+}
+
+function show_dialog(frm, sales_order) {
+	const dialog = new frappe.ui.Dialog({
+		title: __('Update Sales Order Item'),
+		fields: [
+			{
+				label: __('Sales Order'),
+				fieldname: 'sales_order',
+				fieldtype: 'Link',
+				options: 'Sales Order',
+				default: sales_order,
+				read_only: 1
+			},
+			{
+				label: __('Sales Order Item'),
+				fieldname: 'sales_order_item',
+				fieldtype: 'Link',
+				options: 'Item',
+				reqd: 1,
+				get_query: function () {
+					return {
+						query: 'eseller_suite.eseller_suite.doctype.afn_order_shipment_log.afn_order_shipment_log.get_sales_order_items',
+						filters: {
+							sales_order: dialog.get_value('sales_order')
+						}
+					};
+				}
+			},
+			{
+				label: __('New Item'),
+				fieldname: 'new_item',
+				fieldtype: 'Link',
+				options: 'Item',
+				reqd: 1,
+				default: frm.doc.item_code,
+				get_query: function () {
+					return {
+						filters: {
+							is_actual_item: 1
+						}
+					};
+				}
+			}
+		],
+		primary_action_label: __('Update'),
+		primary_action(values) {
+			frappe.call({
+				method: 'eseller_suite.eseller_suite.doctype.afn_order_shipment_log.afn_order_shipment_log.update_sales_order_item',
+				args: {
+					sales_order: values.sales_order,
+					old_item_code: values.sales_order_item,
+					new_item_code: values.new_item
+				},
+				freeze: true,
+				freeze_message: __('Updating Sales Order Item...'),
+				callback: function (r) {
+					if (!r.exc) {
+						frappe.msgprint(__('Sales Order Item updated successfully.'));
+						dialog.hide();
+						frm.reload_doc();
+					}
+				}
+			});
+		}
+	});
+	dialog.show();
 }

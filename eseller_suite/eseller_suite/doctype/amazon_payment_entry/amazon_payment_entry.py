@@ -10,6 +10,7 @@ from frappe import _
 from charset_normalizer import from_path
 from frappe.model.document import Document
 from frappe.utils import get_url_to_form
+from frappe.core.doctype.submission_queue.submission_queue import queue_submission
 
 from eseller_suite.eseller_suite.utils import is_old_data
 
@@ -31,6 +32,12 @@ class AmazonPaymentEntry(Document):
 	def validate(self):
 		if not self.payment_details:
 			self.process_payment_data()
+
+	def submit(self):
+		if len(self.payment_details) > 50:
+			queue_submission(self, "_submit")
+		else:
+			return self._submit()
 
 	def on_submit(self):
 		self.validate_missing_invoices()
