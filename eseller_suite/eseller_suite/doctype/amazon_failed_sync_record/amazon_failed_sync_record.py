@@ -7,6 +7,7 @@ from frappe.model.document import Document
 from frappe.utils import get_url_to_form
 from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository import get_order
 from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings import enhance_hsn_error_with_items
+from eseller_suite.eseller_suite.custom_script.sales_order.sales_order import make_sales_invoice
 
 class AmazonFailedSyncRecord(Document):
 	@frappe.whitelist()
@@ -167,3 +168,51 @@ class AmazonFailedSyncRecord(Document):
 		if so_doc.amazon_order_status == 'Shipped':
 			so_doc.submit()
 		frappe.msgprint('Sales Order Created: <a href="{0}">{1}</a>'.format(get_url_to_form(so_doc.doctype, so_doc.name), so_doc.name), alert=True, indicator='green')
+
+	@frappe.whitelist()
+	def create_return_invoice(self):
+		'''
+			Method to create exceptional Credit Notes, without Sales Invoice
+		'''
+		so = frappe.db.get_value('Sales Order', { 'amazon_order_id':self.amazon_order_id }, 'name')
+		print("Sales Order: ", so)
+		data = json.loads(self.payload)
+		if so:
+			return_si = make_sales_invoice(source_name=so, target_doc=None, ignore_permissions=True)
+			return_si.set_posting_time = 1
+			return_si.posting_date = self.posting_date
+			return_si.posting_time = frappe.utils.get_time(data.get('posting_date'))
+			return_si.update_stock = 1
+			return_si.is_return = 1
+			# items
+			return_si.items = []
+			for row in data.get('items'):
+				return_si.append('items', {
+					'item_code': row.get('item_code'),
+					'qty': int(row.get('qty')) * -1,
+					'rate': abs(row.get('amount')),
+				})
+			# taxes and charges
+			return_si.taxes = []
+			for row in data.get('charges'):
+				return_si.append('taxes', {
+					'account_head': row.get('account_head'),
+					'description': row.get('description'),
+					'tax_amount': row.get('tax_amount'),
+					'charge_type': row.get('charge_type'),
+				})
+			for row in data.get('fees'):
+				return_si.append('taxes', {
+					'account_head': row.get('account_head'),
+					'description': row.get('description'),
+					'tax_amount': row.get('tax_amount'),
+					'charge_type': row.get('charge_type'),
+				})
+			for row in data.get('tds'):
+				return_si.append('taxes', {
+					'account_head': row.get('account_head'),
+					'description': row.get('description'),
+					'tax_amount': row.get('tax_amount'),
+					'charge_type': row.get('charge_type'),
+				})
+			return_si.submit()

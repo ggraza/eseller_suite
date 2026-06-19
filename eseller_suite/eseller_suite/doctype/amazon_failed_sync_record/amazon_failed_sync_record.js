@@ -24,7 +24,7 @@ function handle_custom_buttons(frm) {
 					.then(r => { // checking if the replaced jv is already created from another source
 						if (!r.message.name) {
 							frm.add_custom_button('Journal Entry', () => {
-								create_jv(frm, 'create_replaced_jv');
+								make_frappe_call(frm, 'create_replaced_jv', 'Creating Replaced Journal Entry..');
 							}, 'Create');
 						}
 					})
@@ -34,7 +34,7 @@ function handle_custom_buttons(frm) {
 					.then(r => { // checking if the replaced so is already created from another source
 						if (!r.message.name) {
 							frm.add_custom_button('Sales Order', () => {
-								create_so(frm, 'create_replaced_so');
+								make_frappe_call(frm, 'create_replaced_so', 'Creating Replaced Sales Order..');
 							}, 'Create');
 						}
 					})
@@ -45,7 +45,7 @@ function handle_custom_buttons(frm) {
 				// checking if the adjustment jv is already created from another source
 				if (!r.message.name) {
 					frm.add_custom_button('Journal Entry', () => {
-						create_jv(frm, 'create_adjustment_jv');
+						make_frappe_call(frm, 'create_adjustment_jv', 'Creating Adjustment Journal Entry..');
 					}, 'Create');
 				}
 				else {
@@ -53,13 +53,22 @@ function handle_custom_buttons(frm) {
 						// checking if the adjustment so is already created from another source
 						if (!r.message.name) {
 							frm.add_custom_button('Sales Order', () => {
-								create_so(frm, 'create_adjustment_so');
+								make_frappe_call(frm, 'create_adjustment_so', 'Creating Adjustment Sales Order..');
 							}, 'Create');
 						}
 					})
 				}
 			})
 		}
+        // Return invoice creation
+        frappe.db.get_value('Sales Invoice', { amazon_order_id: frm.doc.amazon_order_id }, 'name').then(r => {
+            // checking if the adjustment so is already created from another source
+            if (!r.message.name) {
+                frm.add_custom_button('Credit Note', () => {
+                    make_frappe_call(frm, 'create_return_invoice', 'Creating Credit Note..');
+                }, 'Create');
+            }
+        })
 	}
 }
 
@@ -105,28 +114,12 @@ function retry_fetching(frm) {
 	}
 }
 
-function create_so(frm, method) {
+function make_frappe_call(frm, method, msg) {
 	frm.call({
 		method: method,
 		doc: frm.doc,
 		freeze: true,
-		freeze_message: __("Creating Replaced Sales Order.."),
-		callback: (r) => {
-			frm.reload_doc();
-			// Redirect to list view since record is deleted
-			setTimeout(() => {
-				frappe.set_route("List", "Amazon Failed Sync Record");
-			}, 1000);
-		}
-	});
-}
-
-function create_jv(frm, method) {
-	frm.call({
-		method: method,
-		doc: frm.doc,
-		freeze: true,
-		freeze_message: __("Creating Adjustment Journal Entry.."),
+		freeze_message: __(msg),
 		callback: (r) => {
 			frm.reload_doc();
 		}
