@@ -1139,10 +1139,7 @@ class AmazonRepository:
 						"Amazon Failed Sync Record",
 						filters={
 							"amazon_order_id": order_id,
-							"remarks": [
-								"like",
-								"%Failed to create return Sales Invoice%",
-							],
+							"remarks": remarks,
 						},
 						limit=1,
 					)
@@ -1151,6 +1148,7 @@ class AmazonRepository:
 						failed_sync_record.amazon_order_id = order_id
 						failed_sync_record.remarks = remarks
 						failed_sync_record.payload = frappe.as_json(refund)
+						failed_sync_record.is_return_exception = 1
 						if refund.get("posting_date"):
 							failed_sync_record.posting_date = dateutil.parser.parse(
 								refund.get("posting_date")

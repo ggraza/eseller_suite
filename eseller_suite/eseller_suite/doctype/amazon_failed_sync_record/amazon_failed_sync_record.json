@@ -10,6 +10,7 @@
   "amazon_order_amount",
   "grand_total",
   "is_multi_company_exception",
+  "is_return_exception",
   "column_break_bmhr",
   "amazon_order_date",
   "posting_date",
@@ -103,12 +104,20 @@
    "fieldname": "is_multi_company_exception",
    "fieldtype": "Check",
    "label": "Is Multi Company Exception"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_return_exception",
+   "fieldtype": "Check",
+   "label": "Is Return Exception",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-12 14:23:15.266446",
+ "modified": "2026-06-19 15:34:36.859789",
  "modified_by": "Administrator",
  "module": "eSeller Suite",
  "name": "Amazon Failed Sync Record",

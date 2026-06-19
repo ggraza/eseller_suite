@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.utils import getdate, today
 from frappe.model.document import Document
 from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository import get_orders
@@ -123,3 +124,47 @@ def get_sales_order_item_codes(amazon_order_id):
 		return []
 
 	return frappe.get_all("Sales Order Item", filters={"parent": sales_order}, pluck="item_code")
+
+@frappe.whitelist()
+def get_sales_order_items(doctype, txt, searchfield, start, page_len, filters):
+	"""Returns item_codes that exist as line items in the given Sales Order."""
+	sales_order = filters.get('sales_order')
+	if not sales_order:
+		return []
+
+	return frappe.db.sql("""
+		SELECT soi.item_code, soi.item_name
+		FROM `tabSales Order Item` soi
+		WHERE soi.parent = %(sales_order)s
+		AND soi.item_code LIKE %(txt)s
+		ORDER BY soi.idx
+		LIMIT %(start)s, %(page_len)s
+	""", {
+		'sales_order': sales_order,
+		'txt': f'%{txt}%',
+		'start': start,
+		'page_len': page_len
+	})
+
+
+@frappe.whitelist()
+def update_sales_order_item(sales_order, old_item_code, new_item_code):
+	"""Replace old_item_code with new_item_code on the given Sales Order's item row."""
+	if not (sales_order and old_item_code and new_item_code):
+		frappe.throw(_('Sales Order, Sales Order Item, and New Item are all required.'))
+
+	so = frappe.get_doc('Sales Order', sales_order)
+
+	matched_row = None
+	for item in so.items:
+		if item.item_code == old_item_code:
+			matched_row = item
+			break
+
+	if not matched_row:
+		frappe.throw(_('Item {0} not found in Sales Order {1}').format(old_item_code, sales_order))
+
+	matched_row.item_code = new_item_code
+	so.flags.ignore_permissions = True  # Ignore permissions to allow updates
+	so.submit()
+	return {'success': True}
