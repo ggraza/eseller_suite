@@ -1,13 +1,16 @@
 # Copyright (c) 2024, efeone and contributors
 # For license information, please see license.txt
 
+import re
+
 import frappe
 import json
 from frappe.model.document import Document
 from frappe.utils import get_url_to_form
+
 from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_repository import get_order
 from eseller_suite.eseller_suite.doctype.amazon_sp_api_settings.amazon_sp_api_settings import enhance_hsn_error_with_items
-from eseller_suite.eseller_suite.custom_script.sales_order.sales_order import make_sales_invoice
+from eseller_suite.eseller_suite.custom_script.sales_order.sales_order import make_sales_invoice, get_account_head
 
 class AmazonFailedSyncRecord(Document):
 	@frappe.whitelist()
@@ -175,7 +178,6 @@ class AmazonFailedSyncRecord(Document):
 			Method to create exceptional Credit Notes, without Sales Invoice
 		'''
 		so = frappe.db.get_value('Sales Order', { 'amazon_order_id':self.amazon_order_id }, 'name')
-		print("Sales Order: ", so)
 		data = json.loads(self.payload)
 		if so:
 			return_si = make_sales_invoice(source_name=so, target_doc=None, ignore_permissions=True)
@@ -189,8 +191,9 @@ class AmazonFailedSyncRecord(Document):
 			for row in data.get('items'):
 				return_si.append('items', {
 					'item_code': row.get('item_code'),
-					'qty': int(row.get('qty')) * -1,
-					'rate': abs(row.get('amount')),
+					'qty': abs(row.get('qty')) * -1,
+					'rate': abs(row.get('amount'))/abs(row.get('qty')),
+					'amount': abs(row.get('amount')) * -1,
 				})
 			# taxes and charges
 			return_si.taxes = []
@@ -215,4 +218,29 @@ class AmazonFailedSyncRecord(Document):
 					'tax_amount': row.get('tax_amount'),
 					'charge_type': row.get('charge_type'),
 				})
+
+			# Handling Company changes
+			company_abr, default_cc = frappe.db.get_value('Company', return_si.company, ['abbr', 'cost_center'])
+			for row in return_si.items:
+				if row.cost_center:
+					current_cc = row.cost_center
+					new_cc = re.sub(r"-[^-]*$", f"- {company_abr}", current_cc)
+					row.cost_center = new_cc if frappe.db.exists('Cost Center', new_cc) else default_cc
+				if row.item_tax_template:
+					current_tax_temp = row.item_tax_template
+					new_tax_temp = re.sub(r"-[^-]*$", f"- {company_abr}", current_tax_temp)
+					row.item_tax_template = new_tax_temp if frappe.db.exists('Item Tax Template', new_tax_temp) else ''
+			return_si.packed_items = []
+
+			for row in return_si.taxes:
+				if row.cost_center:
+					current_cc = row.cost_center
+					new_cc = re.sub(r"-[^-]*$", f"- {company_abr}", current_cc)
+					row.cost_center = new_cc if frappe.db.exists('Cost Center', new_cc) else default_cc
+				if row.account_head:
+					row.account_head = get_account_head(row.account_head, return_si.company)
+
+			return_si.additional_discount_percentage = 0
+			return_si.discount_amount = 0
+			return_si.save(ignore_permissions=True)
 			return_si.submit()
